@@ -18,19 +18,6 @@ jobs:
       - name: Install dependencies
         run: pip install supabase
 
-      - name: Debug secrets presence
-        env:
-          SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
-          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        run: |
-          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
-          echo "GMAIL_USER length: ${#GMAIL_USER}"
-          echo "GMAIL_APP_PASSWORD length: ${#GMAIL_APP_PASSWORD}"
-          CLEAN="${GMAIL_APP_PASSWORD// /}"
-          echo "GMAIL_APP_PASSWORD length (no spaces): ${#CLEAN}"
-
       - name: Check progress and send alerts
         env:
           SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
