@@ -1,0 +1,30 @@
+name: Daily Practice Alert
+
+on:
+  schedule:
+    - cron: '0 22 * * *'  # 5 PM EST (UTC-5). Change to '0 21 * * *' for CST, '0 20 * * *' for MST, '0 17 * * *' for PST.
+  workflow_dispatch:       # allows manual trigger from GitHub Actions tab
+
+jobs:
+  send-alert:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install supabase
+
+      - name: Check progress and send alerts
+        env:
+          SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
+          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SASHA_EMAIL:        ${{ secrets.SASHA_EMAIL }}
+          PARENT_EMAIL:       ${{ secrets.PARENT_EMAIL }}
+          MIN_QUESTIONS:      ${{ secrets.MIN_QUESTIONS }}
+        run: python Sasha_AP/alert.py

@@ -20,7 +20,16 @@ from agent import (
     EXAM_DATE, UNITS, UNIT_WEIGHTS, LEVEL_NAMES, LEVEL_ICONS, DIFFICULTY_NAMES, MODEL,
     load_performance, load_weak_topics, days_remaining,
     tool_get_performance_report, tool_get_weak_topics, tool_get_study_schedule,
+    get_today_questions, MIN_QUESTIONS,
 )
+
+# ── Bridge Streamlit secrets → env vars (for Supabase) ────────────────────────
+for _key in ["SUPABASE_URL", "SUPABASE_KEY"]:
+    if _key not in os.environ:
+        try:
+            os.environ[_key] = st.secrets[_key]
+        except Exception:
+            pass
 
 # ── Page Config ────────────────────────────────────────────────────────────────
 
@@ -121,6 +130,16 @@ with st.sidebar:
         if st.button("🧪 Diagnose", use_container_width=True):
             st.session_state.injected_message = "Run a full diagnostic and tell me what to study first."
             st.rerun()
+
+    # Daily practice progress
+    st.divider()
+    st.subheader("Today's Practice")
+    q_done = get_today_questions()
+    st.progress(min(q_done / MIN_QUESTIONS, 1.0))
+    if q_done >= MIN_QUESTIONS:
+        st.success(f"✅ {q_done}/{MIN_QUESTIONS} questions — great work today!")
+    else:
+        st.warning(f"⚠️ {q_done}/{MIN_QUESTIONS} questions answered today")
 
     # Weak topics expander
     topics = load_weak_topics()

@@ -16,6 +16,7 @@ EXAM_DATE = date(2026, 5, 6)
 WEAK_TOPICS_FILE = "weak_topics.json"
 PERFORMANCE_FILE = "performance.json"
 MODEL = "claude-opus-4-7"
+MIN_QUESTIONS = int(os.environ.get("MIN_QUESTIONS", "5"))
 
 UNITS = [
     "Unit 1: Kinematics",
@@ -165,6 +166,7 @@ Daily structure: 20 min concept review → 20 min practice MCQs → 20 min FRQ p
 - `save_weak_topic`: Call this whenever Sasha struggles with a concept. Be proactive — log it without asking.
 - `get_weak_topics`: Call this when Sasha asks for a review of what to work on, or at the start of a session.
 - `get_study_schedule`: Call this when Sasha asks what to study today or this week.
+- `record_practice_answer`: Call this EVERY TIME Sasha submits an answer to a practice question (MCQ or FRQ part). Pass correct=true if right, correct=false if wrong. Never skip this — it tracks her daily progress for parent notifications.
 
 Always be encouraging. You believe in Sasha completely."""
 
@@ -205,6 +207,20 @@ TOOLS = [
             "type": "object",
             "properties": {},
             "required": []
+        }
+    },
+    {
+        "name": "record_practice_answer",
+        "description": "Record that Sasha answered a practice question. Call after every MCQ or FRQ answer she submits.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "correct": {
+                    "type": "boolean",
+                    "description": "Whether her answer was correct"
+                }
+            },
+            "required": ["correct"]
         }
     }
 ]
@@ -324,6 +340,59 @@ def tool_get_study_schedule() -> str:
     return "\n".join(schedule_lines)
 
 
+_supabase = None
+
+def get_supabase():
+    global _supabase
+    if _supabase is None:
+        url = os.environ.get("SUPABASE_URL")
+        key = os.environ.get("SUPABASE_KEY")
+        if url and key:
+            try:
+                from supabase import create_client
+                _supabase = create_client(url, key)
+            except Exception:
+                pass
+    return _supabase
+
+
+def get_today_questions() -> int:
+    sb = get_supabase()
+    if not sb:
+        return 0
+    try:
+        result = sb.table("daily_progress").select("questions_answered").eq("date", date.today().isoformat()).execute()
+        return result.data[0]["questions_answered"] if result.data else 0
+    except Exception:
+        return 0
+
+
+def tool_record_practice_answer(correct: bool) -> str:
+    sb = get_supabase()
+    if not sb:
+        return "Progress tracking unavailable (Supabase not configured)."
+    try:
+        today = date.today().isoformat()
+        result = sb.table("daily_progress").select("questions_answered").eq("date", today).execute()
+        if result.data:
+            count = result.data[0]["questions_answered"] + 1
+            sb.table("daily_progress").update({
+                "questions_answered": count,
+                "last_updated": datetime.now().isoformat()
+            }).eq("date", today).execute()
+        else:
+            count = 1
+            sb.table("daily_progress").insert({
+                "date": today,
+                "questions_answered": 1,
+                "last_updated": datetime.now().isoformat()
+            }).execute()
+        status = "✓ Correct!" if correct else "Keep going!"
+        return f"{status} ({count}/{MIN_QUESTIONS} questions done today)"
+    except Exception as e:
+        return f"Could not record answer: {e}"
+
+
 def execute_tool(name: str, tool_input: dict) -> str:
     if name == "save_weak_topic":
         return tool_save_weak_topic(tool_input["topic"], tool_input["note"])
@@ -331,6 +400,8 @@ def execute_tool(name: str, tool_input: dict) -> str:
         return tool_get_weak_topics()
     elif name == "get_study_schedule":
         return tool_get_study_schedule()
+    elif name == "record_practice_answer":
+        return tool_record_practice_answer(tool_input["correct"])
     return f"Unknown tool: {name}"
 
 
