@@ -170,6 +170,9 @@ def run_agent(user_text: str):
         api_key = st.secrets["ANTHROPIC_API_KEY"]
     except Exception:
         api_key = os.environ.get("ANTHROPIC_API_KEY")
+    if not api_key:
+        st.error("ANTHROPIC_API_KEY is not set. Go to Manage app → Settings → Secrets and add it.")
+        st.stop()
     client = anthropic.Anthropic(api_key=api_key)
 
     # Agentic loop
