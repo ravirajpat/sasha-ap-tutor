@@ -166,7 +166,10 @@ def run_agent(user_text: str):
     # Add to API history
     st.session_state.api_messages.append({"role": "user", "content": user_text})
 
-    api_key = st.secrets["ANTHROPIC_API_KEY"] if "ANTHROPIC_API_KEY" in st.secrets else os.environ.get("ANTHROPIC_API_KEY")
+    try:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+    except Exception:
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
     client = anthropic.Anthropic(api_key=api_key)
 
     # Agentic loop
