@@ -18,6 +18,15 @@ jobs:
       - name: Install dependencies
         run: pip install supabase
 
+      - name: Debug secrets presence
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: |
+          echo "SUPABASE_URL length: ${#SUPABASE_URL}"
+          echo "SUPABASE_URL starts with: ${SUPABASE_URL:0:10}"
+          echo "SUPABASE_KEY length: ${#SUPABASE_KEY}"
+
       - name: Check progress and send alerts
         env:
           SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
