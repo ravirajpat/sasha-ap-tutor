@@ -11,7 +11,7 @@ from email.mime.text import MIMEText
 
 from supabase import create_client
 
-MIN_QUESTIONS  = int(os.environ.get("MIN_QUESTIONS") or "5")
+MIN_QUESTIONS = int(os.environ.get("MIN_QUESTIONS", "5") or "5")
 SUPABASE_URL   = os.environ["SUPABASE_URL"]
 SUPABASE_KEY   = os.environ["SUPABASE_KEY"]
 GMAIL_USER     = os.environ["GMAIL_USER"]
