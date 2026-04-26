@@ -5,19 +5,19 @@ Sends email to Sasha and parent if she hasn't answered MIN_QUESTIONS today.
 """
 
 import os
-import smtplib
+import urllib.request
+import json
 from datetime import date
-from email.mime.text import MIMEText
 
 from supabase import create_client
 
-MIN_QUESTIONS = int(os.environ.get("MIN_QUESTIONS", "5") or "5")
-SUPABASE_URL   = os.environ["SUPABASE_URL"]
-SUPABASE_KEY   = os.environ["SUPABASE_KEY"]
-GMAIL_USER     = os.environ["GMAIL_USER"]
-GMAIL_PASSWORD = os.environ["GMAIL_APP_PASSWORD"]
-SASHA_EMAIL    = os.environ["SASHA_EMAIL"]
-PARENT_EMAIL   = os.environ["PARENT_EMAIL"]
+MIN_QUESTIONS     = int(os.environ.get("MIN_QUESTIONS") or "5")
+SUPABASE_URL      = os.environ["SUPABASE_URL"]
+SUPABASE_KEY      = os.environ["SUPABASE_KEY"]
+SENDGRID_API_KEY  = os.environ["SENDGRID_API_KEY"]
+SENDER_EMAIL      = os.environ["SENDER_EMAIL"]
+SASHA_EMAIL       = os.environ["SASHA_EMAIL"]
+PARENT_EMAIL      = os.environ["PARENT_EMAIL"]
 
 
 def get_today_questions() -> int:
@@ -27,13 +27,22 @@ def get_today_questions() -> int:
 
 
 def send_email(to: str, subject: str, body: str):
-    msg = MIMEText(body)
-    msg["Subject"] = subject
-    msg["From"]    = GMAIL_USER
-    msg["To"]      = to
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
-        server.login(GMAIL_USER, GMAIL_PASSWORD)
-        server.send_message(msg)
+    payload = json.dumps({
+        "personalizations": [{"to": [{"email": to}]}],
+        "from": {"email": SENDER_EMAIL},
+        "subject": subject,
+        "content": [{"type": "text/plain", "value": body}],
+    }).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.sendgrid.com/v3/mail/send",
+        data=payload,
+        headers={
+            "Authorization": f"Bearer {SENDGRID_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    urllib.request.urlopen(req)
 
 
 def main():
