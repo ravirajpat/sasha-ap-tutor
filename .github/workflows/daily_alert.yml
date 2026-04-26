@@ -20,19 +20,23 @@ jobs:
 
       - name: Debug secrets presence
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
+          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
         run: |
           echo "SUPABASE_URL length: ${#SUPABASE_URL}"
-          echo "SUPABASE_URL starts with: ${SUPABASE_URL:0:10}"
-          echo "SUPABASE_KEY length: ${#SUPABASE_KEY}"
+          echo "GMAIL_USER length: ${#GMAIL_USER}"
+          echo "GMAIL_APP_PASSWORD length: ${#GMAIL_APP_PASSWORD}"
+          CLEAN="${GMAIL_APP_PASSWORD// /}"
+          echo "GMAIL_APP_PASSWORD length (no spaces): ${#CLEAN}"
 
       - name: Check progress and send alerts
         env:
           SUPABASE_URL:       ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY:       ${{ secrets.SUPABASE_KEY }}
-          SENDGRID_API_KEY:   ${{ secrets.SENDGRID_API_KEY }}
-          SENDER_EMAIL:       ${{ secrets.SENDER_EMAIL }}
+          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           SASHA_EMAIL:        ${{ secrets.SASHA_EMAIL }}
           PARENT_EMAIL:       ${{ secrets.PARENT_EMAIL }}
           MIN_QUESTIONS:      ${{ secrets.MIN_QUESTIONS }}
