@@ -34,8 +34,8 @@ for _key in ["SUPABASE_URL", "SUPABASE_KEY"]:
 # ── Page Config ────────────────────────────────────────────────────────────────
 
 st.set_page_config(
-    page_title="AP Physics 1 Tutor",
-    page_icon="⚛️",
+    page_title="AP Tutor — Sasha",
+    page_icon="📚",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -44,12 +44,73 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    /* Shrink the top padding on the main content block */
+    /* ── Base ── */
     .block-container { padding-top: 0.75rem !important; }
-    /* Hide the blank Streamlit header bar */
     header[data-testid="stHeader"] { height: 0 !important; min-height: 0 !important; }
-    /* Reduce sidebar top padding */
     section[data-testid="stSidebar"] > div:first-child { padding-top: 0.75rem !important; }
+
+    /* Touch-friendly buttons on all devices */
+    .stButton > button {
+        min-height: 44px;
+        touch-action: manipulation;  /* no double-tap zoom */
+    }
+
+    /* Tabs: horizontal scroll so they never wrap/overflow on small screens */
+    [data-testid="stTabs"] [role="tablist"] {
+        overflow-x: auto;
+        white-space: nowrap;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* ── Tablet (≤ 900px) ── */
+    @media screen and (max-width: 900px) {
+        .block-container {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
+        /* Allow Streamlit columns to wrap */
+        [data-testid="stHorizontalBlock"] {
+            flex-wrap: wrap !important;
+            gap: 6px !important;
+        }
+        /* 2 per row on tablet — quick actions become 2×2, formula cols stay 2 */
+        [data-testid="column"] {
+            min-width: calc(50% - 6px) !important;
+            flex: 1 1 calc(50% - 6px) !important;
+        }
+    }
+
+    /* ── Mobile (≤ 600px) ── */
+    @media screen and (max-width: 600px) {
+        .block-container {
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+            max-width: 100vw !important;
+        }
+        /* 3 per row: works for 3-col and 5-col (calculator) grids;
+           quick actions become 2×2 via min-content / growth */
+        [data-testid="column"] {
+            min-width: calc(33% - 6px) !important;
+            flex: 1 1 calc(33% - 6px) !important;
+        }
+        /* Bigger tap targets on phone */
+        .stButton > button {
+            min-height: 52px !important;
+            font-size: 1rem !important;
+        }
+        /* Prevent iOS auto-zoom when focusing inputs (triggers at < 16px) */
+        input, textarea,
+        [data-testid="stChatInput"] textarea,
+        [data-testid="stTextInput"] input {
+            font-size: 16px !important;
+        }
+        /* Scale headings down */
+        h1 { font-size: 1.4rem !important; }
+        h2 { font-size: 1.1rem !important; }
+        [data-testid="stMetricValue"] { font-size: 1.5rem !important; }
+        /* Sidebar narrower on phone */
+        section[data-testid="stSidebar"] { min-width: 240px !important; }
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -417,40 +478,40 @@ with tab_formulas:
     st.subheader(f"{cfg.display_name} — Formula Reference")
     st.caption("All the formulas you need, organized by unit. Keep this tab open while you practice!")
 
-    cols = st.columns(2)
-    for i, (unit_name, unit_data) in enumerate(active_sheet.items()):
-        with cols[i % 2]:
-            icon  = unit_data["icon"]
-            color = unit_data["color"]
-            tip   = unit_data["tips"]
+    # Build all unit cards as a single CSS-grid block — fully responsive:
+    # desktop → 2 cols, tablet → 1-2 cols, mobile → 1 col (auto-fit)
+    cards_html = ""
+    for unit_name, unit_data in active_sheet.items():
+        color = unit_data["color"]
+        icon  = unit_data["icon"]
+        tip   = unit_data["tips"]
+        rows  = "".join(
+            f"<tr>"
+            f"<td style='color:#aaa;font-size:0.8em;padding:3px 10px 3px 0;"
+            f"white-space:nowrap;vertical-align:top'>{lbl}</td>"
+            f"<td style='font-family:monospace;font-size:0.88em;padding:3px 0;"
+            f"word-break:break-word'>{fml}</td>"
+            f"</tr>"
+            for lbl, fml in unit_data["formulas"]
+        )
+        cards_html += (
+            f"<div style='background:#0e1117;border:1px solid #1e1e2e;"
+            f"border-radius:10px;padding:14px 16px;'>"
+            f"<div style='border-left:4px solid {color};padding:4px 10px;margin-bottom:8px'>"
+            f"<span style='font-size:1em;font-weight:700;color:{color}'>{icon} {unit_name}</span>"
+            f"</div>"
+            f"<table style='width:100%;border-collapse:collapse'>{rows}</table>"
+            f"<div style='font-size:0.78em;color:#888;background:#12121f;"
+            f"border-radius:5px;padding:6px 9px;margin-top:8px'>💡 {tip}</div>"
+            f"</div>"
+        )
 
-            # Unit header
-            st.markdown(
-                f"<div style='border-left:4px solid {color};padding:6px 12px;margin-bottom:4px;'>"
-                f"<span style='font-size:1.05em;font-weight:700;color:{color}'>{icon} {unit_name}</span>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-            # Formula rows
-            rows_md = "".join(
-                f"<tr>"
-                f"<td style='color:#aaa;font-size:0.78em;padding:2px 8px 2px 0;white-space:nowrap'>{label}</td>"
-                f"<td style='font-family:monospace;font-size:0.92em;padding:2px 0'>{formula}</td>"
-                f"</tr>"
-                for label, formula in unit_data["formulas"]
-            )
-            st.markdown(
-                f"<table style='width:100%;border-collapse:collapse;margin-bottom:4px'>{rows_md}</table>",
-                unsafe_allow_html=True,
-            )
-
-            # Tip
-            st.markdown(
-                f"<div style='font-size:0.78em;color:#888;background:#1a1a2e;border-radius:4px;"
-                f"padding:5px 8px;margin-bottom:16px'>💡 {tip}</div>",
-                unsafe_allow_html=True,
-            )
+    st.markdown(
+        f"<div style='display:grid;"
+        f"grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));"
+        f"gap:1rem;margin-top:0.25rem'>{cards_html}</div>",
+        unsafe_allow_html=True,
+    )
 
 # ── Calculator Tab ────────────────────────────────────────────────────────────
 
@@ -511,61 +572,65 @@ with tab_calc:
         else:
             st.session_state.calc_expr += val
 
-    # ── Layout ─────────────────────────────────────────────────────────────────
-    _, disp_col, _ = st.columns([1, 3, 1])
-    with disp_col:
-        st.subheader("Scientific Calculator")
+    # ── Layout — centred container that shrinks gracefully on mobile ───────────
+    # Use CSS max-width so on desktop it stays narrow; on mobile it fills the screen
+    st.markdown(
+        "<div style='max-width:480px;margin:0 auto'>",
+        unsafe_allow_html=True,
+    )
+    st.subheader("Scientific Calculator")
 
-        # Degree / Radian toggle
-        deg_col, _ = st.columns([1, 3])
-        with deg_col:
-            st.session_state.calc_deg = st.toggle(
-                "Degrees", value=st.session_state.calc_deg,
-                help="Toggle between degrees and radians for trig functions"
-            )
-
-        # Display
-        expr_display = st.session_state.calc_expr or "0"
-        result_display = f"= {st.session_state.calc_result}" if st.session_state.calc_result else ""
-        st.markdown(
-            f"<div style='background:#0e1117;border:1px solid #333;border-radius:8px;"
-            f"padding:12px 16px;margin-bottom:8px;min-height:64px'>"
-            f"<div style='color:#888;font-size:0.85em;font-family:monospace;min-height:1.2em'>{expr_display}</div>"
-            f"<div style='color:#fff;font-size:1.6em;font-weight:700;font-family:monospace'>{result_display}</div>"
-            f"</div>",
-            unsafe_allow_html=True,
+    # Degree / Radian toggle
+    deg_col, _ = st.columns([1, 3])
+    with deg_col:
+        st.session_state.calc_deg = st.toggle(
+            "Degrees", value=st.session_state.calc_deg,
+            help="Toggle between degrees and radians for trig functions"
         )
 
-        # Button grid: [label shown, value appended]
-        ROWS = [
-            [("sin(","sin("), ("cos(","cos("), ("tan(","tan("), ("log(","log("), ("ln(","ln(")],
-            [("√(","√("),    ("xʸ","^"),       ("(",  "("),     (")",  ")"),     ("π", "π")],
-            [("C", "C"),     ("⌫","⌫"),         ("e",  "e"),    ("%",  "%"),     ("1/(","1/(")],
-            [("7","7"),      ("8","8"),          ("9","9"),       ("÷","/")],
-            [("4","4"),      ("5","5"),          ("6","6"),       ("×","*")],
-            [("1","1"),      ("2","2"),          ("3","3"),       ("−","-")],
-            [("0","0"),      (".","."  ),        ("=","="),       ("+","+")],
-        ]
+    # Display
+    expr_display = st.session_state.calc_expr or "0"
+    result_display = f"= {st.session_state.calc_result}" if st.session_state.calc_result else ""
+    st.markdown(
+        f"<div style='background:#0e1117;border:1px solid #333;border-radius:8px;"
+        f"padding:12px 16px;margin-bottom:8px;min-height:64px'>"
+        f"<div style='color:#888;font-size:0.85em;font-family:monospace;min-height:1.2em'>{expr_display}</div>"
+        f"<div style='color:#fff;font-size:1.6em;font-weight:700;font-family:monospace'>{result_display}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
-        # Style: highlight = and C differently
-        HIGHLIGHT = {"=": "#4e9af1", "C": "#e05c5c"}
+    # Button grid: [label shown, value appended]
+    ROWS = [
+        [("sin(","sin("), ("cos(","cos("), ("tan(","tan("), ("log(","log("), ("ln(","ln(")],
+        [("√(","√("),    ("xʸ","^"),       ("(",  "("),     (")",  ")"),     ("π", "π")],
+        [("C", "C"),     ("⌫","⌫"),         ("e",  "e"),    ("%",  "%"),     ("1/(","1/(")],
+        [("7","7"),      ("8","8"),          ("9","9"),       ("÷","/")],
+        [("4","4"),      ("5","5"),          ("6","6"),       ("×","*")],
+        [("1","1"),      ("2","2"),          ("3","3"),       ("−","-")],
+        [("0","0"),      (".","."  ),        ("=","="),       ("+","+")],
+    ]
 
-        for r_idx, row in enumerate(ROWS):
-            cols = st.columns(len(row))
-            for c_idx, (label, val) in enumerate(row):
-                bg = HIGHLIGHT.get(val, "#262730")
-                with cols[c_idx]:
-                    st.markdown(
-                        f"<style>#calc_btn_{r_idx}_{c_idx} button{{"
-                        f"background-color:{bg}!important;"
-                        f"font-size:1.05em!important;font-weight:600!important}}</style>",
-                        unsafe_allow_html=True,
-                    )
-                    if st.button(label, key=f"calc_btn_{r_idx}_{c_idx}", use_container_width=True):
-                        _calc_press(val)
-                        st.rerun()
+    HIGHLIGHT = {"=": "#4e9af1", "C": "#e05c5c"}
 
-        st.caption("Tip: ^ for power · log = log₁₀ · ln = natural log · trig in degrees by default")
+    for r_idx, row in enumerate(ROWS):
+        cols = st.columns(len(row))
+        for c_idx, (label, val) in enumerate(row):
+            bg = HIGHLIGHT.get(val, "#262730")
+            with cols[c_idx]:
+                st.markdown(
+                    f"<style>#calc_btn_{r_idx}_{c_idx} button{{"
+                    f"background-color:{bg}!important;"
+                    f"font-size:1.05em!important;font-weight:600!important}}</style>",
+                    unsafe_allow_html=True,
+                )
+                if st.button(label, key=f"calc_btn_{r_idx}_{c_idx}", use_container_width=True):
+                    _calc_press(val)
+                    st.rerun()
+
+    st.caption("Tip: ^ for power · log = log₁₀ · ln = natural log · trig in degrees by default")
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # ── Chat Tab ───────────────────────────────────────────────────────────────────
 
