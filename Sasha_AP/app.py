@@ -506,6 +506,23 @@ if _daily_quiz == "true" and _subject_param in AGENTS:
     )
     st.rerun()
 
+# Handle concept review link from morning email (?concepts=true&subject=physics&topic=...)
+_concepts      = st.query_params.get("concepts", "")
+_concept_subj  = st.query_params.get("subject", "")
+_concept_topic = st.query_params.get("topic", "")
+if _concepts == "true" and _concept_subj in AGENTS:
+    st.query_params.clear()
+    if st.session_state.active_agent != _concept_subj:
+        st.session_state.active_agent = _concept_subj
+    _topic_label = _concept_topic or get_daily_topic(AGENTS[_concept_subj])
+    st.session_state.injected_message = (
+        f"Give me a structured concept summary for **{_topic_label}** — I have a quiz on this today. "
+        f"Cover: (1) the 4–5 core concepts I must know, (2) all essential formulas with a one-line "
+        f"explanation of when to use each, and (3) the top 3 mistakes students make on the AP exam "
+        f"for this topic. Keep it concise — I want to read it in under 5 minutes."
+    )
+    st.rerun()
+
 # Skip-to-content link (keyboard users tab to it; visually hidden until focused)
 st.markdown('<a class="skip-link" href="#main-content">Skip to chat</a>', unsafe_allow_html=True)
 

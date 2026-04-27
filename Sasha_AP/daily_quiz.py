@@ -35,7 +35,11 @@ def send_quiz_email(cfg, topic: str) -> None:
     days_left = (cfg.exam_date - today).days
     today_str = today.strftime("%A, %B %d")
     color     = SUBJECT_COLOR.get(cfg.key, "#4e9af1")
-    app_link  = f"{APP_URL}?daily_quiz=true&subject={cfg.key}"
+
+    # URL-safe topic for query param
+    from urllib.parse import quote
+    concepts_link = f"{APP_URL}?concepts=true&subject={cfg.key}&topic={quote(topic)}"
+    quiz_link     = f"{APP_URL}?daily_quiz=true&subject={cfg.key}"
 
     # Short unit label for the email subject line (strip the "Unit N:" prefix)
     short_topic = topic.split(":", 1)[-1].strip() if ":" in topic else topic
@@ -73,18 +77,41 @@ def send_quiz_email(cfg, topic: str) -> None:
         It takes about 15–20 minutes.
       </p>
 
-      <!-- CTA -->
-      <div style="text-align:center;margin:28px 0 24px">
-        <a href="{app_link}"
+      <!-- Step 1: Review Concepts -->
+      <div style="background:#f8f9fb;border:1px solid #e8eaf0;border-radius:10px;
+                  padding:16px 20px;margin-bottom:16px">
+        <p style="margin:0 0 4px;font-size:0.78rem;font-weight:600;color:#888;
+                  letter-spacing:0.05em;text-transform:uppercase">Step 1 · Warm up (5 min)</p>
+        <p style="margin:0 0 12px;font-size:0.9rem;color:#444;line-height:1.5">
+          Read the concept summary — key ideas, formulas, and common mistakes for
+          <strong>{short_topic}</strong>.
+        </p>
+        <a href="{concepts_link}"
+           style="display:inline-block;background:#fff;color:{color};text-decoration:none;
+                  padding:9px 22px;border-radius:7px;font-size:0.88rem;font-weight:600;
+                  border:1.5px solid {color}">
+          📖&nbsp; Review Concepts
+        </a>
+      </div>
+
+      <!-- Step 2: Take Quiz -->
+      <div style="background:#f8f9fb;border:1px solid #e8eaf0;border-radius:10px;
+                  padding:16px 20px;margin-bottom:20px">
+        <p style="margin:0 0 4px;font-size:0.78rem;font-weight:600;color:#888;
+                  letter-spacing:0.05em;text-transform:uppercase">Step 2 · Quiz (15–20 min)</p>
+        <p style="margin:0 0 12px;font-size:0.9rem;color:#444;line-height:1.5">
+          4 MCQ + 1 FRQ at moderate difficulty. Take your time and show your work on the FRQ.
+        </p>
+        <a href="{quiz_link}"
            style="display:inline-block;background:{color};color:#fff;text-decoration:none;
-                  padding:13px 38px;border-radius:9px;font-size:1rem;font-weight:600;
-                  letter-spacing:0.01em;box-shadow:0 2px 8px {color}55">
+                  padding:9px 22px;border-radius:7px;font-size:0.88rem;font-weight:600;
+                  box-shadow:0 2px 6px {color}44">
           🚀&nbsp; Start Today's Quiz
         </a>
       </div>
 
       <p style="color:#aaa;font-size:0.78rem;text-align:center;margin:0">
-        Opens in your AP Tutor app · Questions generated fresh for you
+        Both links open in your AP Tutor app
       </p>
     </div>
 
