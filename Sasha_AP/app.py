@@ -11,6 +11,7 @@ import sys
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import math
 import anthropic
 import streamlit as st
 from datetime import date
@@ -38,6 +39,21 @@ st.set_page_config(
     page_icon="⚛️",
     layout="wide",
     initial_sidebar_state="expanded",
+)
+
+# ── Global CSS ────────────────────────────────────────────────────────────────
+st.markdown(
+    """
+    <style>
+    /* Shrink the top padding on the main content block */
+    .block-container { padding-top: 0.75rem !important; }
+    /* Hide the blank Streamlit header bar */
+    header[data-testid="stHeader"] { height: 0 !important; min-height: 0 !important; }
+    /* Reduce sidebar top padding */
+    section[data-testid="stSidebar"] > div:first-child { padding-top: 0.75rem !important; }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 # ── Session State Init ─────────────────────────────────────────────────────────
@@ -107,30 +123,6 @@ with st.sidebar:
             unsafe_allow_html=True,
         )
 
-    st.divider()
-
-    # Quick action buttons
-    st.subheader("Quick Actions")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("📅 Schedule", use_container_width=True):
-            st.session_state.injected_message = "What's my recommended study schedule?"
-            st.rerun()
-    with col2:
-        if st.button("⚠️ Weak Topics", use_container_width=True):
-            st.session_state.injected_message = "Show me my weak topics."
-            st.rerun()
-
-    col3, col4 = st.columns(2)
-    with col3:
-        if st.button("📊 Report", use_container_width=True):
-            st.session_state.injected_message = "Give me my full progress report."
-            st.rerun()
-    with col4:
-        if st.button("🧪 Diagnose", use_container_width=True):
-            st.session_state.injected_message = "Run a full diagnostic and tell me what to study first."
-            st.rerun()
-
     # Daily practice progress
     st.divider()
     st.subheader("Today's Practice")
@@ -149,136 +141,420 @@ with st.sidebar:
             for t in topics:
                 st.markdown(f"• **{t['topic']}** — {t['note']}")
 
-# ── Main Chat Area ─────────────────────────────────────────────────────────────
+# ── Formula Sheet Data ─────────────────────────────────────────────────────────
+
+FORMULA_SHEET = {
+    "Unit 1: Kinematics": {
+        "icon": "📐",
+        "color": "#4e9af1",
+        "formulas": [
+            ("Velocity", "v = v₀ + at"),
+            ("Displacement", "x = v₀t + ½at²"),
+            ("Velocity²", "v² = v₀² + 2ax"),
+            ("Avg velocity", "x = ½(v + v₀)t"),
+            ("Projectile x", "x = v₀ₓ · t"),
+            ("Projectile y", "y = v₀ᵧt − ½gt²"),
+            ("Free fall (g)", "g = 9.8 m/s²  ↓"),
+        ],
+        "tips": "Sign convention matters! Pick a positive direction and stick with it.",
+    },
+    "Unit 2: Force and Translational Dynamics": {
+        "icon": "⚙️",
+        "color": "#e05c5c",
+        "formulas": [
+            ("Newton's 2nd", "F_net = ma"),
+            ("Weight", "W = mg"),
+            ("Kinetic friction", "f_k = μ_k N"),
+            ("Static friction", "f_s ≤ μ_s N"),
+            ("Centripetal acc.", "a_c = v²/r"),
+            ("Centripetal force", "F_c = mv²/r"),
+            ("Universal gravity", "F_g = Gm₁m₂/r²"),
+        ],
+        "tips": "Draw a free-body diagram first. Every force needs a source object.",
+    },
+    "Unit 3: Work, Energy, and Power": {
+        "icon": "⚡",
+        "color": "#f0a500",
+        "formulas": [
+            ("Work", "W = Fd·cosθ"),
+            ("Kinetic energy", "KE = ½mv²"),
+            ("Gravitational PE", "PE_g = mgh"),
+            ("Spring PE", "PE_s = ½kx²"),
+            ("Work-energy thm.", "W_net = ΔKE"),
+            ("Conservation", "KE₁ + PE₁ = KE₂ + PE₂"),
+            ("Power", "P = W/t = Fv"),
+        ],
+        "tips": "Energy is conserved only when no non-conservative forces (friction) do work.",
+    },
+    "Unit 4: Linear Momentum": {
+        "icon": "🏃",
+        "color": "#2ecc71",
+        "formulas": [
+            ("Momentum", "p = mv"),
+            ("Impulse", "J = FΔt = Δp"),
+            ("Conservation", "p₁ᵢ + p₂ᵢ = p₁f + p₂f"),
+            ("Perfectly inelastic", "(m₁+m₂)v' = m₁v₁ + m₂v₂"),
+            ("Elastic (KE conserved)", "KE_total is conserved"),
+            ("Center of mass", "x_cm = (m₁x₁ + m₂x₂)/(m₁+m₂)"),
+        ],
+        "tips": "Momentum is always conserved in collisions. KE is only conserved in elastic collisions.",
+    },
+    "Unit 5: Torque and Rotational Dynamics": {
+        "icon": "🔄",
+        "color": "#9b59b6",
+        "formulas": [
+            ("Torque", "τ = rF·sinθ"),
+            ("Newton's 2nd (rot.)", "τ_net = Iα"),
+            ("Point mass inertia", "I = mr²"),
+            ("Rod (center pivot)", "I = 1/12 mL²"),
+            ("Rod (end pivot)", "I = 1/3 mL²"),
+            ("Solid disk/cylinder", "I = ½mr²"),
+            ("Arc-linear link", "a = αr,  v = ωr"),
+        ],
+        "tips": "Torque direction: counterclockwise = positive. The pivot point choice is yours!",
+    },
+    "Unit 6: Energy and Momentum of Rotating Systems": {
+        "icon": "🌀",
+        "color": "#1abc9c",
+        "formulas": [
+            ("Rotational KE", "KE_rot = ½Iω²"),
+            ("Rolling total KE", "KE = ½mv² + ½Iω²"),
+            ("Angular momentum", "L = Iω"),
+            ("Angular impulse", "τ·Δt = ΔL"),
+            ("Conservation of L", "L_i = L_f  (when τ_net = 0)"),
+            ("Angular velocity", "ω = 2πf = 2π/T"),
+        ],
+        "tips": "When a spinning skater pulls in arms, I decreases → ω increases (L conserved).",
+    },
+    "Unit 7: Oscillations": {
+        "icon": "〰️",
+        "color": "#e67e22",
+        "formulas": [
+            ("Hooke's Law", "F = −kx"),
+            ("Spring PE", "PE = ½kx²"),
+            ("Spring period", "T = 2π√(m/k)"),
+            ("Pendulum period", "T = 2π√(L/g)"),
+            ("Frequency", "f = 1/T"),
+            ("Angular freq.", "ω = 2πf = √(k/m)"),
+            ("Position", "x(t) = A·cos(ωt)"),
+            ("Max speed", "v_max = Aω  (at x = 0)"),
+        ],
+        "tips": "At equilibrium: max speed, zero PE. At amplitude: zero speed, max PE.",
+    },
+    "Unit 8: Fluids": {
+        "icon": "💧",
+        "color": "#00b4d8",
+        "formulas": [
+            ("Density", "ρ = m/V"),
+            ("Pressure", "P = F/A"),
+            ("Fluid pressure", "P = P₀ + ρgh"),
+            ("Buoyant force", "F_b = ρ_fluid · V_disp · g"),
+            ("Continuity", "A₁v₁ = A₂v₂"),
+            ("Bernoulli's eq.", "P + ½ρv² + ρgh = const"),
+        ],
+        "tips": "Object floats when F_b ≥ weight. Faster flow → lower pressure (Bernoulli).",
+    },
+}
+
+# ── Main Area ──────────────────────────────────────────────────────────────────
 
 st.title("AP Physics 1 Tutor")
 st.caption(f"Hi Sasha! You have **{days_left} days** until your exam on {exam_str}. Let's get to work! 💪")
 
-# Welcome message on first load
-if not st.session_state.chat_history:
-    welcome = (
-        f"Hi Sasha! 👋 I'm your AP Physics 1 tutor. You have **{days_left} days** until your exam on **{exam_str}**.\n\n"
-        "Here's what we can do together:\n"
-        "- **Diagnose** your understanding of any unit\n"
-        "- **Quiz** you with MCQ and FRQ questions at your exact level\n"
-        "- **Track** your progress and adjust difficulty automatically\n"
-        "- **Plan** your study schedule based on what needs the most work\n\n"
-        "Try saying: *'Test me on Energy'* or *'Give me a hard FRQ on Momentum'* or *'What should I study today?'*"
-    )
-    st.session_state.chat_history.append(("assistant", welcome))
+# Quick actions — always visible above the tabs
+qa1, qa2, qa3, qa4 = st.columns(4)
+with qa1:
+    if st.button("📅 Schedule", use_container_width=True):
+        st.session_state.injected_message = "What's my recommended study schedule?"
+        st.rerun()
+with qa2:
+    if st.button("⚠️ Weak Topics", use_container_width=True):
+        st.session_state.injected_message = "Show me my weak topics."
+        st.rerun()
+with qa3:
+    if st.button("📊 Report", use_container_width=True):
+        st.session_state.injected_message = "Give me my full progress report."
+        st.rerun()
+with qa4:
+    if st.button("🧪 Diagnose", use_container_width=True):
+        st.session_state.injected_message = "Run a full diagnostic and tell me what to study first."
+        st.rerun()
 
-# Render chat history
-for role, text in st.session_state.chat_history:
-    with st.chat_message(role, avatar="🎓" if role == "assistant" else "👩‍🎓"):
-        st.markdown(text)
+tab_chat, tab_formulas, tab_calc = st.tabs(["💬 Chat", "📐 Formula Sheet", "🔢 Calculator"])
 
-# ── Message Handling ───────────────────────────────────────────────────────────
+# ── Formula Sheet Tab ──────────────────────────────────────────────────────────
 
-def run_agent(user_text: str):
-    """Run the full agentic loop for a user message, streaming the response."""
+with tab_formulas:
+    st.subheader("AP Physics 1 — Formula Reference")
+    st.caption("All the formulas you need, organized by unit. Keep this tab open while you practice!")
 
-    # Show user message
-    with st.chat_message("user", avatar="👩‍🎓"):
-        st.markdown(user_text)
-    st.session_state.chat_history.append(("user", user_text))
+    cols = st.columns(2)
+    for i, (unit_name, unit_data) in enumerate(FORMULA_SHEET.items()):
+        with cols[i % 2]:
+            icon  = unit_data["icon"]
+            color = unit_data["color"]
+            tip   = unit_data["tips"]
 
-    # Add to API history
-    st.session_state.api_messages.append({"role": "user", "content": user_text})
+            # Unit header
+            st.markdown(
+                f"<div style='border-left:4px solid {color};padding:6px 12px;margin-bottom:4px;'>"
+                f"<span style='font-size:1.05em;font-weight:700;color:{color}'>{icon} {unit_name}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
 
-    try:
-        api_key = st.secrets["ANTHROPIC_API_KEY"]
-    except Exception:
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-    if not api_key:
-        st.error("ANTHROPIC_API_KEY is not set. Go to Manage app → Settings → Secrets and add it.")
-        st.stop()
-    client = anthropic.Anthropic(api_key=api_key)
+            # Formula rows
+            rows_md = "".join(
+                f"<tr>"
+                f"<td style='color:#aaa;font-size:0.78em;padding:2px 8px 2px 0;white-space:nowrap'>{label}</td>"
+                f"<td style='font-family:monospace;font-size:0.92em;padding:2px 0'>{formula}</td>"
+                f"</tr>"
+                for label, formula in unit_data["formulas"]
+            )
+            st.markdown(
+                f"<table style='width:100%;border-collapse:collapse;margin-bottom:4px'>{rows_md}</table>",
+                unsafe_allow_html=True,
+            )
 
-    # Agentic loop
-    while True:
-        full_text = ""
-        assistant_content = []
+            # Tip
+            st.markdown(
+                f"<div style='font-size:0.78em;color:#888;background:#1a1a2e;border-radius:4px;"
+                f"padding:5px 8px;margin-bottom:16px'>💡 {tip}</div>",
+                unsafe_allow_html=True,
+            )
 
-        with st.chat_message("assistant", avatar="🎓"):
-            placeholder = st.empty()
+# ── Calculator Tab ────────────────────────────────────────────────────────────
 
-            with client.messages.stream(
-                model=MODEL,
-                max_tokens=4096,
-                thinking={"type": "adaptive"},
-                system=[{
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }],
-                tools=TOOLS,
-                messages=st.session_state.api_messages,
-            ) as stream:
-                for event in stream:
-                    if event.type == "content_block_delta":
-                        if event.delta.type == "text_delta":
-                            full_text += event.delta.text
-                            placeholder.markdown(full_text + "▌")
+with tab_calc:
+    if "calc_expr" not in st.session_state:
+        st.session_state.calc_expr = ""
+    if "calc_result" not in st.session_state:
+        st.session_state.calc_result = ""
+    if "calc_deg" not in st.session_state:
+        st.session_state.calc_deg = True
 
-                final_msg = stream.get_final_message()
+    # ── Safe eval context ──────────────────────────────────────────────────────
+    def _make_ctx(deg_mode: bool) -> dict:
+        if deg_mode:
+            trig = {
+                "sin":  lambda x: math.sin(math.radians(x)),
+                "cos":  lambda x: math.cos(math.radians(x)),
+                "tan":  lambda x: math.tan(math.radians(x)),
+                "asin": lambda x: math.degrees(math.asin(x)),
+                "acos": lambda x: math.degrees(math.acos(x)),
+                "atan": lambda x: math.degrees(math.atan(x)),
+            }
+        else:
+            trig = {
+                "sin": math.sin, "cos": math.cos, "tan": math.tan,
+                "asin": math.asin, "acos": math.acos, "atan": math.atan,
+            }
+        trig.update({
+            "sqrt": math.sqrt, "log": math.log10, "ln": math.log,
+            "abs": abs, "pi": math.pi, "e": math.e,
+            "floor": math.floor, "ceil": math.ceil,
+        })
+        return trig
 
-            # Remove streaming cursor
-            if full_text:
-                placeholder.markdown(full_text)
-            else:
-                placeholder.empty()
+    def _calc_press(val: str):
+        if val == "C":
+            st.session_state.calc_expr = ""
+            st.session_state.calc_result = ""
+        elif val == "⌫":
+            st.session_state.calc_expr = st.session_state.calc_expr[:-1]
+            st.session_state.calc_result = ""
+        elif val == "=":
+            try:
+                expr = (
+                    st.session_state.calc_expr
+                    .replace("^", "**")
+                    .replace("π", "pi")
+                    .replace("√(", "sqrt(")
+                )
+                ctx = _make_ctx(st.session_state.calc_deg)
+                raw = eval(expr, {"__builtins__": {}}, ctx)  # noqa: S307
+                if isinstance(raw, float) and raw.is_integer():
+                    st.session_state.calc_result = str(int(raw))
+                else:
+                    st.session_state.calc_result = f"{raw:.8g}"
+            except Exception:
+                st.session_state.calc_result = "Error — check expression"
+        else:
+            st.session_state.calc_expr += val
 
-            # Collect assistant content blocks for API history
-            for block in final_msg.content:
-                if block.type == "text":
-                    assistant_content.append({"type": "text", "text": block.text})
-                elif block.type == "tool_use":
-                    assistant_content.append({
-                        "type": "tool_use",
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input,
-                    })
-                elif block.type == "thinking":
-                    assistant_content.append({
-                        "type": "thinking",
-                        "thinking": block.thinking,
-                        "signature": block.signature,
-                    })
+    # ── Layout ─────────────────────────────────────────────────────────────────
+    _, disp_col, _ = st.columns([1, 3, 1])
+    with disp_col:
+        st.subheader("Scientific Calculator")
 
-            # Execute tools if needed
-            if final_msg.stop_reason == "tool_use":
-                tool_results = []
+        # Degree / Radian toggle
+        deg_col, _ = st.columns([1, 3])
+        with deg_col:
+            st.session_state.calc_deg = st.toggle(
+                "Degrees", value=st.session_state.calc_deg,
+                help="Toggle between degrees and radians for trig functions"
+            )
+
+        # Display
+        expr_display = st.session_state.calc_expr or "0"
+        result_display = f"= {st.session_state.calc_result}" if st.session_state.calc_result else ""
+        st.markdown(
+            f"<div style='background:#0e1117;border:1px solid #333;border-radius:8px;"
+            f"padding:12px 16px;margin-bottom:8px;min-height:64px'>"
+            f"<div style='color:#888;font-size:0.85em;font-family:monospace;min-height:1.2em'>{expr_display}</div>"
+            f"<div style='color:#fff;font-size:1.6em;font-weight:700;font-family:monospace'>{result_display}</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        # Button grid: [label shown, value appended]
+        ROWS = [
+            [("sin(","sin("), ("cos(","cos("), ("tan(","tan("), ("log(","log("), ("ln(","ln(")],
+            [("√(","√("),    ("xʸ","^"),       ("(",  "("),     (")",  ")"),     ("π", "π")],
+            [("C", "C"),     ("⌫","⌫"),         ("e",  "e"),    ("%",  "%"),     ("1/(","1/(")],
+            [("7","7"),      ("8","8"),          ("9","9"),       ("÷","/")],
+            [("4","4"),      ("5","5"),          ("6","6"),       ("×","*")],
+            [("1","1"),      ("2","2"),          ("3","3"),       ("−","-")],
+            [("0","0"),      (".","."  ),        ("=","="),       ("+","+")],
+        ]
+
+        # Style: highlight = and C differently
+        HIGHLIGHT = {"=": "#4e9af1", "C": "#e05c5c"}
+
+        for r_idx, row in enumerate(ROWS):
+            cols = st.columns(len(row))
+            for c_idx, (label, val) in enumerate(row):
+                bg = HIGHLIGHT.get(val, "#262730")
+                with cols[c_idx]:
+                    st.markdown(
+                        f"<style>#calc_btn_{r_idx}_{c_idx} button{{"
+                        f"background-color:{bg}!important;"
+                        f"font-size:1.05em!important;font-weight:600!important}}</style>",
+                        unsafe_allow_html=True,
+                    )
+                    if st.button(label, key=f"calc_btn_{r_idx}_{c_idx}", use_container_width=True):
+                        _calc_press(val)
+                        st.rerun()
+
+        st.caption("Tip: ^ for power · log = log₁₀ · ln = natural log · trig in degrees by default")
+
+# ── Chat Tab ───────────────────────────────────────────────────────────────────
+
+with tab_chat:
+    # Welcome message on first load
+    if not st.session_state.chat_history:
+        welcome = (
+            f"Hi Sasha! 👋 I'm your AP Physics 1 tutor. You have **{days_left} days** until your exam on **{exam_str}**.\n\n"
+            "Here's what we can do together:\n"
+            "- **Diagnose** your understanding of any unit\n"
+            "- **Quiz** you with MCQ and FRQ questions at your exact level\n"
+            "- **Track** your progress and adjust difficulty automatically\n"
+            "- **Plan** your study schedule based on what needs the most work\n\n"
+            "Try saying: *'Test me on Energy'* or *'Give me a hard FRQ on Momentum'* or *'What should I study today?'*\n\n"
+            "_Tip: click the **📐 Formula Sheet** tab anytime to look up a formula while you practice!_"
+        )
+        st.session_state.chat_history.append(("assistant", welcome))
+
+    # Render chat history
+    for role, text in st.session_state.chat_history:
+        with st.chat_message(role, avatar="🎓" if role == "assistant" else "👩‍🎓"):
+            st.markdown(text)
+
+    # ── Message Handling ───────────────────────────────────────────────────────
+
+    def run_agent(user_text: str):
+        with st.chat_message("user", avatar="👩‍🎓"):
+            st.markdown(user_text)
+        st.session_state.chat_history.append(("user", user_text))
+        st.session_state.api_messages.append({"role": "user", "content": user_text})
+
+        try:
+            api_key = st.secrets["ANTHROPIC_API_KEY"]
+        except Exception:
+            api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if not api_key:
+            st.error("ANTHROPIC_API_KEY is not set. Go to Manage app → Settings → Secrets and add it.")
+            st.stop()
+        client = anthropic.Anthropic(api_key=api_key)
+
+        while True:
+            full_text = ""
+            assistant_content = []
+
+            with st.chat_message("assistant", avatar="🎓"):
+                placeholder = st.empty()
+
+                with client.messages.stream(
+                    model=MODEL,
+                    max_tokens=4096,
+                    thinking={"type": "adaptive"},
+                    system=[{
+                        "type": "text",
+                        "text": SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }],
+                    tools=TOOLS,
+                    messages=st.session_state.api_messages,
+                ) as stream:
+                    for event in stream:
+                        if event.type == "content_block_delta":
+                            if event.delta.type == "text_delta":
+                                full_text += event.delta.text
+                                placeholder.markdown(full_text + "▌")
+
+                    final_msg = stream.get_final_message()
+
+                if full_text:
+                    placeholder.markdown(full_text)
+                else:
+                    placeholder.empty()
+
                 for block in final_msg.content:
-                    if block.type == "tool_use":
-                        tool_label = block.name.replace("_", " ").title()
-                        with st.status(f"Using tool: {tool_label}…", expanded=False) as status:
-                            result = execute_tool(block.name, block.input)
-                            status.update(label=f"✓ {tool_label}", state="complete")
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": result,
+                    if block.type == "text":
+                        assistant_content.append({"type": "text", "text": block.text})
+                    elif block.type == "tool_use":
+                        assistant_content.append({
+                            "type": "tool_use",
+                            "id": block.id,
+                            "name": block.name,
+                            "input": block.input,
+                        })
+                    elif block.type == "thinking":
+                        assistant_content.append({
+                            "type": "thinking",
+                            "thinking": block.thinking,
+                            "signature": block.signature,
                         })
 
-        st.session_state.api_messages.append({"role": "assistant", "content": assistant_content})
+                if final_msg.stop_reason == "tool_use":
+                    tool_results = []
+                    for block in final_msg.content:
+                        if block.type == "tool_use":
+                            tool_label = block.name.replace("_", " ").title()
+                            with st.status(f"Using tool: {tool_label}…", expanded=False) as status:
+                                result = execute_tool(block.name, block.input)
+                                status.update(label=f"✓ {tool_label}", state="complete")
+                            tool_results.append({
+                                "type": "tool_result",
+                                "tool_use_id": block.id,
+                                "content": result,
+                            })
 
-        if final_msg.stop_reason != "tool_use":
-            # Save final text to display history
-            if full_text:
-                st.session_state.chat_history.append(("assistant", full_text))
-            break
+            st.session_state.api_messages.append({"role": "assistant", "content": assistant_content})
 
-        # Feed tool results back for next iteration
-        st.session_state.api_messages.append({"role": "user", "content": tool_results})
+            if final_msg.stop_reason != "tool_use":
+                if full_text:
+                    st.session_state.chat_history.append(("assistant", full_text))
+                break
 
+            st.session_state.api_messages.append({"role": "user", "content": tool_results})
 
-# Handle injected message (from sidebar buttons)
-if st.session_state.injected_message:
-    msg = st.session_state.injected_message
-    st.session_state.injected_message = None
-    run_agent(msg)
+    # Handle injected message (from sidebar buttons)
+    if st.session_state.injected_message:
+        msg = st.session_state.injected_message
+        st.session_state.injected_message = None
+        run_agent(msg)
 
-# Handle typed input
-if prompt := st.chat_input("Ask me anything, or say 'test me on Energy'…"):
-    run_agent(prompt)
+    # Handle typed input
+    if prompt := st.chat_input("Ask me anything, or say 'test me on Energy'…"):
+        run_agent(prompt)

@@ -356,41 +356,67 @@ def get_supabase():
     return _supabase
 
 
+DAILY_PROGRESS_FILE = "daily_progress.json"
+
+
+def _local_get_today() -> int:
+    if not os.path.exists(DAILY_PROGRESS_FILE):
+        return 0
+    with open(DAILY_PROGRESS_FILE) as f:
+        data = json.load(f)
+    return data.get(date.today().isoformat(), 0)
+
+
+def _local_increment_today() -> int:
+    today = date.today().isoformat()
+    data = {}
+    if os.path.exists(DAILY_PROGRESS_FILE):
+        with open(DAILY_PROGRESS_FILE) as f:
+            data = json.load(f)
+    data[today] = data.get(today, 0) + 1
+    with open(DAILY_PROGRESS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+    return data[today]
+
+
 def get_today_questions() -> int:
     sb = get_supabase()
-    if not sb:
-        return 0
-    try:
-        result = sb.table("daily_progress").select("questions_answered").eq("date", date.today().isoformat()).execute()
-        return result.data[0]["questions_answered"] if result.data else 0
-    except Exception:
-        return 0
+    if sb:
+        try:
+            result = sb.table("daily_progress").select("questions_answered").eq("date", date.today().isoformat()).execute()
+            return result.data[0]["questions_answered"] if result.data else 0
+        except Exception:
+            pass
+    return _local_get_today()
 
 
 def tool_record_practice_answer(correct: bool) -> str:
+    today = date.today().isoformat()
     sb = get_supabase()
-    if not sb:
-        return "Progress tracking unavailable (Supabase not configured)."
-    try:
-        today = date.today().isoformat()
-        result = sb.table("daily_progress").select("questions_answered").eq("date", today).execute()
-        if result.data:
-            count = result.data[0]["questions_answered"] + 1
-            sb.table("daily_progress").update({
-                "questions_answered": count,
-                "last_updated": datetime.now().isoformat()
-            }).eq("date", today).execute()
-        else:
-            count = 1
-            sb.table("daily_progress").insert({
-                "date": today,
-                "questions_answered": 1,
-                "last_updated": datetime.now().isoformat()
-            }).execute()
-        status = "✓ Correct!" if correct else "Keep going!"
-        return f"{status} ({count}/{MIN_QUESTIONS} questions done today)"
-    except Exception as e:
-        return f"Could not record answer: {e}"
+    if sb:
+        try:
+            result = sb.table("daily_progress").select("questions_answered").eq("date", today).execute()
+            if result.data:
+                count = result.data[0]["questions_answered"] + 1
+                sb.table("daily_progress").update({
+                    "questions_answered": count,
+                    "last_updated": datetime.now().isoformat()
+                }).eq("date", today).execute()
+            else:
+                count = 1
+                sb.table("daily_progress").insert({
+                    "date": today,
+                    "questions_answered": 1,
+                    "last_updated": datetime.now().isoformat()
+                }).execute()
+            status = "✓ Correct!" if correct else "Keep going!"
+            return f"{status} ({count}/{MIN_QUESTIONS} questions done today)"
+        except Exception:
+            pass
+    # Local fallback
+    count = _local_increment_today()
+    status = "✓ Correct!" if correct else "Keep going!"
+    return f"{status} ({count}/{MIN_QUESTIONS} questions done today)"
 
 
 def execute_tool(name: str, tool_input: dict) -> str:
