@@ -1,0 +1,28 @@
+name: Daily Quiz Email
+
+on:
+  schedule:
+    - cron: '0 13 * * *'   # 8 AM EST (UTC−5) / 9 AM EDT (UTC−4)
+  workflow_dispatch:        # manual trigger from GitHub Actions tab
+
+jobs:
+  send-quiz:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic
+
+      - name: Send daily quiz email
+        env:
+          GMAIL_USER:         ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          SASHA_EMAIL:        ${{ secrets.SASHA_EMAIL }}
+          APP_URL:            ${{ secrets.APP_URL }}
+        run: python Sasha_AP/daily_quiz.py

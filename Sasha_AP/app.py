@@ -20,7 +20,7 @@ from agent import (
     AGENTS, TOOLS, execute_tool,
     LEVEL_NAMES, LEVEL_ICONS, DIFFICULTY_NAMES, MODEL,
     load_performance, load_weak_topics, days_remaining,
-    get_today_questions, MIN_QUESTIONS,
+    get_today_questions, get_daily_topic, MIN_QUESTIONS,
 )
 
 # ── Bridge Streamlit secrets → env vars (for Supabase) ────────────────────────
@@ -487,6 +487,23 @@ _action = st.query_params.get("action", "")
 if _action in _ACTION_MAP:
     st.query_params.clear()
     st.session_state.injected_message = _ACTION_MAP[_action]
+    st.rerun()
+
+# Handle daily quiz link from morning email (?daily_quiz=true&subject=physics)
+_daily_quiz    = st.query_params.get("daily_quiz", "")
+_subject_param = st.query_params.get("subject", "")
+if _daily_quiz == "true" and _subject_param in AGENTS:
+    st.query_params.clear()
+    if st.session_state.active_agent != _subject_param:
+        st.session_state.active_agent = _subject_param
+    _quiz_cfg   = AGENTS[_subject_param]
+    _quiz_topic = get_daily_topic(_quiz_cfg)
+    st.session_state.injected_message = (
+        f"Give me today's daily practice set on **{_quiz_topic}**: "
+        f"exactly 4 MCQ questions followed by 1 FRQ, all at moderate difficulty. "
+        f"Format each MCQ with (A)–(D) options and wait for my answer before revealing "
+        f"the solution. Label the FRQ clearly and include what a full-mark response looks like."
+    )
     st.rerun()
 
 # Skip-to-content link (keyboard users tab to it; visually hidden until focused)

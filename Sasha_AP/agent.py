@@ -400,6 +400,22 @@ def get_today_questions(config: AgentConfig) -> int:
             pass
     return _local_get_today(config)
 
+
+def get_daily_topic(config: AgentConfig) -> str:
+    """Return today's study unit using a weight-prioritised round-robin schedule.
+
+    Units are sorted highest-weight first so the most exam-critical topics
+    appear most frequently in the cycle. The mapping is deterministic:
+    the same calendar date always returns the same unit.
+    """
+    ordered = sorted(
+        config.units,
+        key=lambda u: config.unit_weights.get(u, 0),
+        reverse=True,
+    )
+    idx = date.today().toordinal() % len(ordered)
+    return ordered[idx]
+
 # ── Tool implementations ──────────────────────────────────────────────────────
 
 def tool_get_performance_report(config: AgentConfig) -> str:
