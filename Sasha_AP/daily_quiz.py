@@ -20,7 +20,7 @@ from agent import AGENTS, get_daily_topic  # noqa: E402
 GMAIL_USER     = os.environ["GMAIL_USER"]
 GMAIL_PASSWORD = os.environ["GMAIL_APP_PASSWORD"].replace(" ", "")
 SASHA_EMAIL    = os.environ["SASHA_EMAIL"]
-PARENT_EMAIL   = os.environ["PARENT_EMAIL"]
+PARENT_EMAILS  = [e.strip() for e in os.environ["PARENT_EMAIL"].split(",") if e.strip()]
 APP_URL        = os.environ.get("APP_URL", "https://sasha-ap-tutor.streamlit.app").rstrip("/")
 
 # Subject accent colours that match the app's formula-card palette
@@ -103,14 +103,14 @@ def send_quiz_email(cfg, topic: str) -> None:
     msg["Subject"] = f"{cfg.icon} AP Quiz Today — {short_topic}"
     msg["From"]    = GMAIL_USER
     msg["To"]      = SASHA_EMAIL
-    msg["Cc"]      = PARENT_EMAIL
+    msg["Cc"]      = ", ".join(PARENT_EMAILS)
     msg.attach(MIMEText(html, "html"))
 
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(GMAIL_USER, GMAIL_PASSWORD)
-        server.send_message(msg, to_addrs=[SASHA_EMAIL, PARENT_EMAIL])
+        server.send_message(msg, to_addrs=[SASHA_EMAIL] + PARENT_EMAILS)
 
-    print(f"[daily_quiz] Sent → {SASHA_EMAIL} (cc: {PARENT_EMAIL}) | {cfg.display_name}: {topic}")
+    print(f"[daily_quiz] Sent → {SASHA_EMAIL} (cc: {', '.join(PARENT_EMAILS)}) | {cfg.display_name}: {topic}")
 
 
 def main():
