@@ -45,8 +45,10 @@ st.markdown(
     """
     <style>
     /* ── Base ── */
-    .block-container { padding-top: 0.75rem !important; }
-    header[data-testid="stHeader"] { height: 0 !important; min-height: 0 !important; }
+    /* Hide only the coloured decoration stripe, keep the toolbar (Deploy, menu) */
+    [data-testid="stDecoration"] { display: none !important; }
+    header[data-testid="stHeader"] { background: transparent !important; }
+    .block-container { padding-top: 1rem !important; }
     section[data-testid="stSidebar"] > div:first-child { padding-top: 0.75rem !important; }
 
     /* Touch-friendly buttons on all devices */
@@ -93,10 +95,11 @@ st.markdown(
             min-width: calc(33% - 6px) !important;
             flex: 1 1 calc(33% - 6px) !important;
         }
-        /* Bigger tap targets on phone */
+        /* Compact but still tap-friendly on phone */
         .stButton > button {
-            min-height: 52px !important;
-            font-size: 1rem !important;
+            min-height: 40px !important;
+            font-size: 0.9rem !important;
+            padding: 0.3rem 0.5rem !important;
         }
         /* Prevent iOS auto-zoom when focusing inputs (triggers at < 16px) */
         input, textarea,
@@ -450,8 +453,8 @@ FORMULA_SHEETS = {
 st.title(f"{cfg.icon} {cfg.display_name} Tutor")
 st.caption(f"Hi Sasha! You have **{days_left} days** until your {cfg.display_name} exam on {exam_str}. Let's get to work! 💪")
 
-# Quick actions — always visible above the tabs
-qa1, qa2, qa3, qa4 = st.columns(4)
+# Quick actions — 2×2 grid, works on every screen size
+qa1, qa2 = st.columns(2)
 with qa1:
     if st.button("📅 Schedule", use_container_width=True):
         st.session_state.injected_message = "What's my recommended study schedule?"
@@ -460,6 +463,7 @@ with qa2:
     if st.button("⚠️ Weak Topics", use_container_width=True):
         st.session_state.injected_message = "Show me my weak topics."
         st.rerun()
+qa3, qa4 = st.columns(2)
 with qa3:
     if st.button("📊 Report", use_container_width=True):
         st.session_state.injected_message = "Give me my full progress report."
