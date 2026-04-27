@@ -82,8 +82,12 @@ st.markdown(
         background: rgba(49,51,63,0.08) !important;
         border-color: rgba(49,51,63,0.7) !important;
     }
+    /* Quick-action text links */
+    a[href*="?action="] { transition: opacity 0.15s; }
+    a[href*="?action="]:hover { text-decoration: underline !important; opacity: 0.75; }
+
     /* Keyboard focus: visible outline for keyboard navigation */
-    button:focus-visible {
+    button:focus-visible, a:focus-visible {
         outline: 2px solid #4e9af1 !important;
         outline-offset: 2px !important;
     }
@@ -472,45 +476,50 @@ FORMULA_SHEETS = {
 
 # ── Main Area ──────────────────────────────────────────────────────────────────
 
+# Handle quick-action links (query param → injected chat message)
+_ACTION_MAP = {
+    "schedule": "What's my recommended study schedule?",
+    "weak":     "Show me my weak topics.",
+    "report":   "Give me my full progress report.",
+    "diagnose": "Run a full diagnostic and tell me what to study first.",
+}
+_action = st.query_params.get("action", "")
+if _action in _ACTION_MAP:
+    st.query_params.clear()
+    st.session_state.injected_message = _ACTION_MAP[_action]
+    st.rerun()
+
 # Skip-to-content link (keyboard users tab to it; visually hidden until focused)
 st.markdown('<a class="skip-link" href="#main-content">Skip to chat</a>', unsafe_allow_html=True)
 
-# Fetch today's count here so it shows in the main area status line
-_q_today = get_today_questions(cfg)
+# Fetch today's count for the status line
+_q_today  = get_today_questions(cfg)
 _goal_icon = "✅" if _q_today >= MIN_QUESTIONS else "📝"
 
-# Top nav bar: compact status title left, Deploy-style action buttons right
-title_col, qa1, qa2, qa3, qa4 = st.columns([3, 1, 1, 1, 1])
-with title_col:
-    st.markdown(
-        f"<div style='display:flex;align-items:baseline;gap:0.6rem;flex-wrap:wrap;padding:6px 0 2px'>"
-        f"<span style='font-size:1.25rem;font-weight:700;line-height:1.2'>{cfg.icon} {cfg.display_name} Tutor</span>"
-        f"<span style='font-size:0.78rem;color:#888;white-space:nowrap' title='Days until exam'>⏳ {days_left}d left</span>"
-        f"<span style='font-size:0.78rem;color:#888;white-space:nowrap' "
-        f"title='Questions answered today vs daily goal'>{_goal_icon} {_q_today}/{MIN_QUESTIONS} today</span>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
-with qa1:
-    if st.button("📅 Schedule", use_container_width=True, key="qa_sched",
-                 help="Get a personalised study schedule based on your weak areas"):
-        st.session_state.injected_message = "What's my recommended study schedule?"
-        st.rerun()
-with qa2:
-    if st.button("⚠️ Weak Topics", use_container_width=True, key="qa_weak",
-                 help="See which topics need the most practice right now"):
-        st.session_state.injected_message = "Show me my weak topics."
-        st.rerun()
-with qa3:
-    if st.button("📊 Report", use_container_width=True, key="qa_rpt",
-                 help="View your full progress report across all units"):
-        st.session_state.injected_message = "Give me my full progress report."
-        st.rerun()
-with qa4:
-    if st.button("🧪 Diagnose", use_container_width=True, key="qa_diag",
-                 help="Run a diagnostic to find your biggest knowledge gaps"):
-        st.session_state.injected_message = "Run a full diagnostic and tell me what to study first."
-        st.rerun()
+# One-line header: title · status badges · text link shortcuts (no button chrome)
+_ls = "color:#4e9af1;text-decoration:none;font-size:0.8rem;white-space:nowrap"
+st.markdown(
+    f"<div style='display:flex;align-items:center;flex-wrap:wrap;"
+    f"gap:0.4rem 1rem;padding:6px 0 4px'>"
+    f"<span style='font-size:1.25rem;font-weight:700;line-height:1.2'>"
+    f"{cfg.icon} {cfg.display_name} Tutor</span>"
+    f"<span style='font-size:0.78rem;color:#888;white-space:nowrap' "
+    f"title='Days until exam'>⏳ {days_left}d left</span>"
+    f"<span style='font-size:0.78rem;color:#888;white-space:nowrap' "
+    f"title='Questions answered today vs daily goal'>{_goal_icon} {_q_today}/{MIN_QUESTIONS} today</span>"
+    f"<span style='margin-left:auto;display:flex;align-items:center;"
+    f"gap:0.25rem 0.6rem;flex-wrap:wrap'>"
+    f"<a href='?action=schedule' style='{_ls}' title='Get a personalised study schedule'>📅 Schedule</a>"
+    f"<span style='color:#ccc'>·</span>"
+    f"<a href='?action=weak' style='{_ls}' title='See your weak topics'>⚠️ Weak Topics</a>"
+    f"<span style='color:#ccc'>·</span>"
+    f"<a href='?action=report' style='{_ls}' title='View full progress report'>📊 Report</a>"
+    f"<span style='color:#ccc'>·</span>"
+    f"<a href='?action=diagnose' style='{_ls}' title='Run a diagnostic'>🧪 Diagnose</a>"
+    f"</span>"
+    f"</div>",
+    unsafe_allow_html=True,
+)
 
 tab_chat, tab_formulas, tab_calc = st.tabs(["💬 Chat", "📐 Formula Sheet", "🔢 Calculator"])
 
