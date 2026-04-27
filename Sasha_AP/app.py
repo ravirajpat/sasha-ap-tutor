@@ -155,7 +155,7 @@ with st.sidebar:
 
 # ── Formula Sheet Data ─────────────────────────────────────────────────────────
 
-FORMULA_SHEET = {
+PHYSICS_FORMULA_SHEET = {
     "Unit 1: Kinematics": {
         "icon": "📐",
         "color": "#4e9af1",
@@ -268,6 +268,122 @@ FORMULA_SHEET = {
     },
 }
 
+CALCULUS_FORMULA_SHEET = {
+    "Unit 1: Limits and Continuity": {
+        "icon": "🎯",
+        "color": "#4e9af1",
+        "formulas": [
+            ("Limit definition", "lim_{x→a} f(x) = L"),
+            ("Continuity", "lim_{x→a} f(x) = f(a)"),
+            ("L'Hôpital's Rule", "0/0 or ∞/∞ → lim f/g = lim f'/g'"),
+            ("Squeeze Theorem", "g(x) ≤ f(x) ≤ h(x), g→L, h→L ⟹ f→L"),
+            ("sin limit", "lim_{x→0} sin(x)/x = 1"),
+            ("IVT", "f cont. on [a,b] → takes every value between f(a), f(b)"),
+        ],
+        "tips": "Check left and right limits separately — if they differ, the limit doesn't exist.",
+    },
+    "Unit 2: Differentiation — Basic Rules": {
+        "icon": "📏",
+        "color": "#e05c5c",
+        "formulas": [
+            ("Definition", "f'(x) = lim_{h→0} [f(x+h)−f(x)] / h"),
+            ("Power Rule", "d/dx[xⁿ] = nxⁿ⁻¹"),
+            ("Constant", "d/dx[c] = 0"),
+            ("sin / cos", "(sin x)' = cos x,  (cos x)' = −sin x"),
+            ("tan / sec", "(tan x)' = sec²x,  (sec x)' = sec x tan x"),
+            ("eˣ / ln x", "(eˣ)' = eˣ,  (ln x)' = 1/x"),
+            ("aˣ", "(aˣ)' = aˣ ln a"),
+        ],
+        "tips": "Memorise the trig derivatives cold — they show up everywhere on the exam.",
+    },
+    "Unit 3: Differentiation — Chain, Product, Quotient": {
+        "icon": "🔗",
+        "color": "#f0a500",
+        "formulas": [
+            ("Product Rule", "(fg)' = f'g + fg'"),
+            ("Quotient Rule", "(f/g)' = (f'g − fg') / g²"),
+            ("Chain Rule", "(f∘g)' = f'(g(x)) · g'(x)"),
+            ("Implicit diff.", "differentiate both sides w.r.t. x, solve for dy/dx"),
+            ("arcsin", "(arcsin x)' = 1/√(1−x²)"),
+            ("arctan", "(arctan x)' = 1/(1+x²)"),
+            ("Inverse fn.", "d/dx[f⁻¹(x)] = 1 / f'(f⁻¹(x))"),
+        ],
+        "tips": "Chain rule: work from outside in. Always multiply by the derivative of the inside.",
+    },
+    "Unit 4: Contextual Applications": {
+        "icon": "🚗",
+        "color": "#2ecc71",
+        "formulas": [
+            ("Related rates", "differentiate equation w.r.t. t; substitute known values"),
+            ("Linear approx.", "L(x) = f(a) + f'(a)(x − a)"),
+            ("Position → vel.", "v(t) = s'(t)"),
+            ("Vel. → accel.", "a(t) = v'(t) = s''(t)"),
+            ("Avg rate of change", "[f(b) − f(a)] / (b − a)"),
+            ("Inst. rate of change", "f'(x)  (the derivative)"),
+        ],
+        "tips": "Related rates: draw a diagram, label variables, write an equation, then differentiate.",
+    },
+    "Unit 5: Analytical Applications": {
+        "icon": "📊",
+        "color": "#9b59b6",
+        "formulas": [
+            ("Mean Value Thm.", "f'(c) = [f(b)−f(a)] / (b−a)  for some c ∈ (a,b)"),
+            ("Rolle's Theorem", "f(a)=f(b) ⟹ f'(c)=0 for some c"),
+            ("Critical points", "f'(x) = 0  or  f'(x) undefined"),
+            ("1st deriv. test", "f' changes + → − : local max;  − → + : local min"),
+            ("2nd deriv. test", "f''(c) > 0 : local min;  f''(c) < 0 : local max"),
+            ("Concavity", "f'' > 0 : concave up;  f'' < 0 : concave down"),
+            ("Inflection point", "f'' changes sign"),
+        ],
+        "tips": "EVT: continuous on [a,b] → absolute max/min exist. Always check endpoints!",
+    },
+    "Unit 6: Integration": {
+        "icon": "∫",
+        "color": "#1abc9c",
+        "formulas": [
+            ("FTC Part 1", "d/dx[∫ₐˣ f(t)dt] = f(x)"),
+            ("FTC Part 2", "∫ₐᵇ f(x)dx = F(b) − F(a)"),
+            ("Power Rule", "∫xⁿ dx = xⁿ⁺¹/(n+1) + C  (n ≠ −1)"),
+            ("∫eˣ / ∫(1/x)", "∫eˣ dx = eˣ + C;  ∫(1/x) dx = ln|x| + C"),
+            ("∫trig", "∫sin x dx = −cos x + C;  ∫cos x dx = sin x + C"),
+            ("u-substitution", "∫f(g(x))g'(x)dx = ∫f(u)du"),
+            ("Int. by parts", "∫u dv = uv − ∫v du"),
+        ],
+        "tips": "u-sub: pick u = inside function, check that du appears (or can be arranged) in the integral.",
+    },
+    "Unit 7: Differential Equations": {
+        "icon": "🌱",
+        "color": "#e67e22",
+        "formulas": [
+            ("Separable DE", "dy/dx = g(x)h(y)  →  ∫dy/h(y) = ∫g(x)dx"),
+            ("Exponential growth", "dy/dt = ky  →  y = Ce^(kt)"),
+            ("Doubling time", "t = ln2 / k"),
+            ("Half-life", "t = ln2 / |k|"),
+            ("Slope field", "plot dy/dx value as a short segment at each (x,y)"),
+            ("Euler's method", "y_{n+1} = y_n + f(x_n, y_n)·Δx"),
+        ],
+        "tips": "Separable: get all y's on one side and all x's on the other before integrating.",
+    },
+    "Unit 8: Applications of Integration": {
+        "icon": "📐",
+        "color": "#00b4d8",
+        "formulas": [
+            ("Area between curves", "∫ₐᵇ [f(x) − g(x)] dx  (f on top)"),
+            ("Average value", "(1/(b−a)) · ∫ₐᵇ f(x) dx"),
+            ("Net change", "∫ₐᵇ f'(x) dx = f(b) − f(a)"),
+            ("Displacement", "∫ₐᵇ v(t) dt"),
+            ("Total distance", "∫ₐᵇ |v(t)| dt"),
+            ("Accum. from rate", "Amount = initial + ∫ rate dt"),
+        ],
+        "tips": "Distance ≠ displacement! Split the integral where v(t) = 0 to handle absolute value.",
+    },
+}
+
+FORMULA_SHEETS = {
+    "physics":  PHYSICS_FORMULA_SHEET,
+    "calculus": CALCULUS_FORMULA_SHEET,
+}
+
 # ── Main Area ──────────────────────────────────────────────────────────────────
 
 st.title(f"{cfg.icon} {cfg.display_name} Tutor")
@@ -297,11 +413,12 @@ tab_chat, tab_formulas, tab_calc = st.tabs(["💬 Chat", "📐 Formula Sheet", "
 # ── Formula Sheet Tab ──────────────────────────────────────────────────────────
 
 with tab_formulas:
-    st.subheader("AP Physics 1 — Formula Reference")
+    active_sheet = FORMULA_SHEETS[st.session_state.active_agent]
+    st.subheader(f"{cfg.display_name} — Formula Reference")
     st.caption("All the formulas you need, organized by unit. Keep this tab open while you practice!")
 
     cols = st.columns(2)
-    for i, (unit_name, unit_data) in enumerate(FORMULA_SHEET.items()):
+    for i, (unit_name, unit_data) in enumerate(active_sheet.items()):
         with cols[i % 2]:
             icon  = unit_data["icon"]
             color = unit_data["color"]
