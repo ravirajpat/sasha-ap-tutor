@@ -1,71 +1,23 @@
 #!/usr/bin/env python3
 """
-AP Physics 1 Exam Prep Agent for Sasha
-Exam date: May 6, 2026
+AP Exam Prep — Multi-Agent: Physics 1 & Calculus AB
 """
 
 import anthropic
 import json
 import os
 import sys
+from dataclasses import dataclass
 from datetime import date, datetime
 
-# ── Configuration ────────────────────────────────────────────────────────────
+# ── Global constants ──────────────────────────────────────────────────────────
 
-EXAM_DATE = date(2026, 5, 6)
-WEAK_TOPICS_FILE = "weak_topics.json"
-PERFORMANCE_FILE = "performance.json"
-MODEL = "claude-opus-4-7"
+MODEL         = "claude-opus-4-7"
 MIN_QUESTIONS = int(os.environ.get("MIN_QUESTIONS", "5"))
 
-UNITS = [
-    "Unit 1: Kinematics",
-    "Unit 2: Force and Translational Dynamics",
-    "Unit 3: Work, Energy, and Power",
-    "Unit 4: Linear Momentum",
-    "Unit 5: Torque and Rotational Dynamics",
-    "Unit 6: Energy and Momentum of Rotating Systems",
-    "Unit 7: Oscillations",
-    "Unit 8: Fluids",
-]
-
-UNIT_WEIGHTS = {
-    "Kinematics": 10,
-    "Forces & Translational Dynamics": 18,
-    "Work, Energy, and Power": 18,
-    "Linear Momentum": 10,
-    "Torque and Rotational Dynamics": 10,
-    "Energy and Momentum of Rotating Systems": 5,
-    "Oscillations": 5,
-    "Fluids": 10
-    ,
-}
-
-LEVEL_NAMES = {
-    0: "Untested",
-    1: "Beginner",
-    2: "Developing",
-    3: "Proficient",
-    4: "Advanced",
-    5: "Expert",
-}
-
-LEVEL_ICONS = {
-    0: "○○○○○",
-    1: "●○○○○",
-    2: "●●○○○",
-    3: "●●●○○",
-    4: "●●●●○",
-    5: "●●●●●",
-}
-
-DIFFICULTY_NAMES = {
-    1: "Easy",
-    2: "Medium",
-    3: "Hard",
-}
-
-# ── ANSI colors ───────────────────────────────────────────────────────────────
+LEVEL_NAMES = {0: "Untested", 1: "Beginner", 2: "Developing", 3: "Proficient", 4: "Advanced", 5: "Expert"}
+LEVEL_ICONS = {0: "○○○○○", 1: "●○○○○", 2: "●●○○○", 3: "●●●○○", 4: "●●●●○", 5: "●●●●●"}
+DIFFICULTY_NAMES = {1: "Easy", 2: "Medium", 3: "Hard"}
 
 RESET  = "\033[0m"
 BOLD   = "\033[1m"
@@ -75,9 +27,62 @@ YELLOW = "\033[93m"
 RED    = "\033[91m"
 DIM    = "\033[2m"
 
-# ── System Prompt ─────────────────────────────────────────────────────────────
+# ── AgentConfig ───────────────────────────────────────────────────────────────
 
-SYSTEM_PROMPT = """You are Sasha's personal AP Physics 1 tutor. Sasha is a 15-year-old student with her AP Physics 1 exam on May 6, 2026.
+@dataclass
+class AgentConfig:
+    key: str                  # "physics" | "calculus"
+    display_name: str         # shown in UI
+    icon: str                 # emoji
+    exam_date: date
+    units: list
+    unit_weights: dict        # unit_name → int (%)
+    system_prompt: str
+    performance_file: str
+    weak_topics_file: str
+    daily_progress_file: str
+
+# ── Shared Tools schema (same for both agents) ────────────────────────────────
+
+TOOLS = [
+    {
+        "name": "save_weak_topic",
+        "description": "Save a topic Sasha is struggling with for later review. Call this proactively whenever she makes an error or seems confused.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string", "description": "The specific topic or concept she's struggling with"},
+                "note":  {"type": "string", "description": "Brief note about what was confusing or the mistake she made"},
+            },
+            "required": ["topic", "note"],
+        },
+    },
+    {
+        "name": "get_weak_topics",
+        "description": "Retrieve the list of topics Sasha has struggled with in past sessions.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "get_study_schedule",
+        "description": "Get a recommended day-by-day study schedule based on days remaining and weak topics.",
+        "input_schema": {"type": "object", "properties": {}, "required": []},
+    },
+    {
+        "name": "record_practice_answer",
+        "description": "Record that Sasha answered a practice question. Call after every MCQ or FRQ answer she submits.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "correct": {"type": "boolean", "description": "Whether her answer was correct"},
+            },
+            "required": ["correct"],
+        },
+    },
+]
+
+# ── System Prompts ─────────────────────────────────────────────────────────────
+
+_PHYSICS_PROMPT = """You are Sasha's personal AP Physics 1 tutor. Sasha is a 15-year-old student with her AP Physics 1 exam on May 6, 2026.
 
 ## Your Role
 You are a warm, encouraging, and brilliant physics tutor. You explain concepts clearly using real-world analogies. You celebrate wins and help Sasha build confidence. You adapt your teaching to what she's struggling with.
@@ -93,35 +98,26 @@ You are a warm, encouraging, and brilliant physics tutor. You explain concepts c
 |------|-------|---------|
 | 1 | Kinematics (1D & 2D, projectile motion) | 10% |
 | 2 | Forces & Newton's Laws (F=ma, friction, normal force) | 18% |
-| 3 | Circular Motion & Gravitation (centripetal, gravity) | 7% |
-| 4 | Energy (work, KE, PE, conservation of energy) | 17% |
-| 5 | Momentum & Impulse (collisions, conservation) | 12% |
-| 6 | Simple Harmonic Motion (springs, pendulums) | 5% |
-| 7 | Torque & Rotational Motion (moment of inertia, angular momentum) | 12% |
-| 8 | Electric Charge & Force (Coulomb's law, conductors) | 7% |
-| 9 | DC Circuits (Ohm's law, series/parallel, Kirchhoff's laws) | 10% |
-| 10 | Mechanical Waves & Sound (interference, standing waves) | 10% |
+| 3 | Work, Energy, and Power | 18% |
+| 4 | Linear Momentum & Impulse (collisions, conservation) | 10% |
+| 5 | Torque & Rotational Motion (moment of inertia, angular momentum) | 12% |
+| 6 | Energy and Momentum of Rotating Systems | 5% |
+| 7 | Oscillations (springs, pendulums) | 7% |
+| 8 | Fluids (pressure, buoyancy, Bernoulli) | 10% |
 
 ## Key Formulas Sasha Should Know
 - Kinematics: v = v₀ + at, x = v₀t + ½at², v² = v₀² + 2ax
 - Forces: F = ma, W = mg, f = μN
-- Circular: ac = v²/r, Fc = mv²/r
+- Centripetal: ac = v²/r, Fc = mv²/r
 - Gravity: Fg = Gm₁m₂/r²
-- Energy: KE = ½mv², PE = mgh, W = Fd·cosθ
+- Energy: KE = ½mv², PE = mgh, W = Fd·cosθ, P = W/t
 - Momentum: p = mv, J = FΔt = Δp
 - Springs: F = -kx, PE = ½kx², T = 2π√(m/k)
 - Pendulum: T = 2π√(L/g)
-- Torque: τ = rF·sinθ, τ_net = Iα
-- Electricity: F = kq₁q₂/r², V = IR, P = IV
-- Waves: v = fλ, f = 1/T
+- Torque: τ = rF·sinθ, τ_net = Iα, L = Iω
+- Fluids: P = P₀ + ρgh, F_b = ρgV, A₁v₁ = A₂v₂
 
 ## How You Teach
-
-### When explaining concepts:
-- Start with a real-world example Sasha can visualize
-- Walk through the physics step by step
-- Highlight common exam traps and misconceptions
-- Connect the topic to other units (physics is connected!)
 
 ### When generating practice questions:
 Always format MCQs like this:
@@ -137,208 +133,240 @@ D) [option]
 [Wait for Sasha's answer before revealing solution]
 ```
 
-For FRQs:
-```
-📝 FREE RESPONSE QUESTION
-[Question with scenario, diagram description if needed]
-Part (a): [question]
-Part (b): [question]
-...
-
-[Guide her through each part after she attempts it]
-```
-
 ### When she gets something wrong:
 - Never make her feel bad
 - Say "Close! Here's the trick..." or "Great attempt — let's look at this together"
-- Reteach the concept from a different angle
 - Use the `save_weak_topic` tool to log it for later review
 
 ### When she gets something right:
 - Celebrate! "Yes! Exactly right 🎉"
 - Ask a follow-up to deepen understanding
 
-## Study Strategy for 11 Days
-Prioritize high-weight units: Forces (18%), Energy (17%), Momentum (12%), Torque (12%).
-Daily structure: 20 min concept review → 20 min practice MCQs → 20 min FRQ practice.
-
 ## Tools You Have
-- `save_weak_topic`: Call this whenever Sasha struggles with a concept. Be proactive — log it without asking.
-- `get_weak_topics`: Call this when Sasha asks for a review of what to work on, or at the start of a session.
-- `get_study_schedule`: Call this when Sasha asks what to study today or this week.
-- `record_practice_answer`: Call this EVERY TIME Sasha submits an answer to a practice question (MCQ or FRQ part). Pass correct=true if right, correct=false if wrong. Never skip this — it tracks her daily progress for parent notifications.
+- `save_weak_topic`: Call whenever Sasha struggles. Be proactive — log it without asking.
+- `get_weak_topics`: Call when Sasha asks for a review of weak areas.
+- `get_study_schedule`: Call when Sasha asks what to study today or this week.
+- `record_practice_answer`: Call EVERY TIME Sasha submits an answer. Never skip this.
 
 Always be encouraging. You believe in Sasha completely."""
 
-# ── Tools ─────────────────────────────────────────────────────────────────────
 
-TOOLS = [
-    {
-        "name": "save_weak_topic",
-        "description": "Save a topic Sasha is struggling with for later review. Call this proactively whenever she makes an error or seems confused.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "topic": {
-                    "type": "string",
-                    "description": "The specific topic or concept she's struggling with (e.g., 'Conservation of momentum in 2D collisions')"
-                },
-                "note": {
-                    "type": "string",
-                    "description": "Brief note about what specifically was confusing or the mistake she made"
-                }
-            },
-            "required": ["topic", "note"]
-        }
-    },
-    {
-        "name": "get_weak_topics",
-        "description": "Retrieve the list of topics Sasha has struggled with in past sessions.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    },
-    {
-        "name": "get_study_schedule",
-        "description": "Get a recommended day-by-day study schedule based on days remaining and weak topics.",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "required": []
-        }
-    },
-    {
-        "name": "record_practice_answer",
-        "description": "Record that Sasha answered a practice question. Call after every MCQ or FRQ answer she submits.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "correct": {
-                    "type": "boolean",
-                    "description": "Whether her answer was correct"
-                }
-            },
-            "required": ["correct"]
-        }
-    }
-]
+_CALCULUS_PROMPT = """You are Sasha's personal AP Calculus AB tutor. Sasha is a 15-year-old student with her AP Calculus AB exam on May 11, 2026 at 8:00 AM.
 
-# ── Tool Implementations ───────────────────────────────────────────────────────
+## Your Role
+You are a warm, encouraging, and brilliant math tutor. You build intuition first — graphs and real-world meaning before formulas. You celebrate wins and help Sasha build confidence. You adapt to what she's struggling with.
 
-def load_performance() -> dict:
-    if not os.path.exists(PERFORMANCE_FILE):
+## AP Calculus AB Exam Overview
+- **Format**: 45 MCQ (1 hr 45 min, 50%) + 6 FRQ (1 hr 30 min, 50%)
+- **MCQ**: Part A — 30 questions, no calculator | Part B — 15 questions, calculator allowed
+- **FRQ**: Part A — 2 problems, calculator | Part B — 4 problems, no calculator
+- **Score**: 1-5 scale; colleges typically accept 4 or 5
+
+## AP Calculus AB Content Areas & Approximate Weight
+
+| Unit | Topic | ~Weight |
+|------|-------|---------|
+| 1 | Limits and Continuity | 10% |
+| 2 | Differentiation: Definition and Basic Rules | 11% |
+| 3 | Differentiation: Composite, Implicit, and Inverse Functions | 11% |
+| 4 | Contextual Applications of Differentiation | 12% |
+| 5 | Analytical Applications of Differentiation | 17% |
+| 6 | Integration and Accumulation of Change | 18% |
+| 7 | Differential Equations | 9% |
+| 8 | Applications of Integration | 12% |
+
+## Key Formulas & Theorems Sasha Should Know
+
+### Limits
+- Definition of limit; one-sided limits
+- L'Hôpital's Rule: 0/0 or ∞/∞ → lim f/g = lim f'/g'
+- Squeeze Theorem; Continuity: lim_{x→a} f(x) = f(a)
+
+### Derivatives
+- Definition: f'(x) = lim_{h→0} [f(x+h) − f(x)] / h
+- Power Rule: d/dx[xⁿ] = nxⁿ⁻¹
+- Product Rule: (fg)' = f'g + fg'
+- Quotient Rule: (f/g)' = (f'g − fg') / g²
+- Chain Rule: (f∘g)' = f'(g(x)) · g'(x)
+- Trig: (sin x)' = cos x, (cos x)' = −sin x, (tan x)' = sec²x
+- Exponential/Log: (eˣ)' = eˣ, (ln x)' = 1/x, (aˣ)' = aˣ ln a
+- Inverse trig: (arcsin x)' = 1/√(1−x²), (arctan x)' = 1/(1+x²)
+
+### Integrals
+- FTC Part 1: d/dx[∫ₐˣ f(t)dt] = f(x)
+- FTC Part 2: ∫ₐᵇ f(x)dx = F(b) − F(a)
+- Power Rule: ∫xⁿ dx = xⁿ⁺¹/(n+1) + C (n ≠ −1)
+- ∫eˣ dx = eˣ + C, ∫(1/x) dx = ln|x| + C
+- ∫sin x dx = −cos x + C, ∫cos x dx = sin x + C
+- u-substitution: ∫f(g(x))g'(x)dx = ∫f(u)du
+- Integration by parts: ∫u dv = uv − ∫v du
+
+### Key Theorems
+- Mean Value Theorem: f'(c) = [f(b)−f(a)] / (b−a) for some c ∈ (a,b)
+- Intermediate Value Theorem: continuous on [a,b] → takes every value between f(a) and f(b)
+- Extreme Value Theorem: continuous on [a,b] → has absolute max and min
+- Rolle's Theorem: f(a)=f(b) → f'(c)=0 for some c
+
+### Applications
+- Related rates: differentiate an equation with respect to t
+- Optimization: find critical points, use first or second derivative test
+- Area between curves: ∫[f(x)−g(x)]dx
+- Average value: (1/(b−a)) ∫ₐᵇ f(x)dx
+- Differential equations: separable; exponential growth/decay y = Ce^(kt)
+- Slope fields: match dy/dx expression to the field visually
+
+## How You Teach
+
+### When generating practice questions:
+Always format MCQs like this:
+```
+📝 PRACTICE QUESTION
+[Question text]
+
+A) [option]
+B) [option]
+C) [option]
+D) [option]
+
+[Wait for Sasha's answer before revealing solution]
+```
+
+For FRQs, walk through each part after she attempts it.
+
+### When she gets something wrong:
+- Never make her feel bad
+- Say "Close! Here's the key idea..." or "Great attempt — let me show you the trick"
+- Reteach using a graph or simpler example first
+- Use `save_weak_topic` to log it
+
+### When she gets something right:
+- Celebrate! "Yes! Exactly right 🎉"
+- Ask a quick follow-up to solidify understanding
+
+## Tools You Have
+- `save_weak_topic`: Call whenever Sasha struggles. Be proactive.
+- `get_weak_topics`: Call when she asks for a review of weak areas.
+- `get_study_schedule`: Call when she asks what to study today.
+- `record_practice_answer`: Call EVERY TIME she submits an answer.
+
+Always be encouraging. Calculus is beautiful, and Sasha can absolutely do this!"""
+
+
+# ── Agent Configs ─────────────────────────────────────────────────────────────
+
+PHYSICS_CONFIG = AgentConfig(
+    key="physics",
+    display_name="AP Physics 1",
+    icon="⚛️",
+    exam_date=date(2026, 5, 6),
+    units=[
+        "Unit 1: Kinematics",
+        "Unit 2: Force and Translational Dynamics",
+        "Unit 3: Work, Energy, and Power",
+        "Unit 4: Linear Momentum",
+        "Unit 5: Torque and Rotational Dynamics",
+        "Unit 6: Energy and Momentum of Rotating Systems",
+        "Unit 7: Oscillations",
+        "Unit 8: Fluids",
+    ],
+    unit_weights={
+        "Unit 1: Kinematics": 10,
+        "Unit 2: Force and Translational Dynamics": 18,
+        "Unit 3: Work, Energy, and Power": 18,
+        "Unit 4: Linear Momentum": 10,
+        "Unit 5: Torque and Rotational Dynamics": 12,
+        "Unit 6: Energy and Momentum of Rotating Systems": 5,
+        "Unit 7: Oscillations": 7,
+        "Unit 8: Fluids": 10,
+    },
+    system_prompt=_PHYSICS_PROMPT,
+    performance_file="physics_performance.json",
+    weak_topics_file="physics_weak_topics.json",
+    daily_progress_file="physics_daily_progress.json",
+)
+
+CALCULUS_CONFIG = AgentConfig(
+    key="calculus",
+    display_name="AP Calculus AB",
+    icon="∫",
+    exam_date=date(2026, 5, 11),
+    units=[
+        "Unit 1: Limits and Continuity",
+        "Unit 2: Differentiation: Definition and Basic Rules",
+        "Unit 3: Differentiation: Composite, Implicit, and Inverse Functions",
+        "Unit 4: Contextual Applications of Differentiation",
+        "Unit 5: Analytical Applications of Differentiation",
+        "Unit 6: Integration and Accumulation of Change",
+        "Unit 7: Differential Equations",
+        "Unit 8: Applications of Integration",
+    ],
+    unit_weights={
+        "Unit 1: Limits and Continuity": 10,
+        "Unit 2: Differentiation: Definition and Basic Rules": 11,
+        "Unit 3: Differentiation: Composite, Implicit, and Inverse Functions": 11,
+        "Unit 4: Contextual Applications of Differentiation": 12,
+        "Unit 5: Analytical Applications of Differentiation": 17,
+        "Unit 6: Integration and Accumulation of Change": 18,
+        "Unit 7: Differential Equations": 9,
+        "Unit 8: Applications of Integration": 12,
+    },
+    system_prompt=_CALCULUS_PROMPT,
+    performance_file="calculus_performance.json",
+    weak_topics_file="calculus_weak_topics.json",
+    daily_progress_file="calculus_daily_progress.json",
+)
+
+AGENTS: dict[str, AgentConfig] = {
+    "physics":  PHYSICS_CONFIG,
+    "calculus": CALCULUS_CONFIG,
+}
+
+# ── Persistence helpers ───────────────────────────────────────────────────────
+
+def load_performance(config: AgentConfig) -> dict:
+    if not os.path.exists(config.performance_file):
         return {"units": {}}
-    with open(PERFORMANCE_FILE) as f:
+    with open(config.performance_file) as f:
         return json.load(f)
 
 
-def save_performance(data: dict) -> None:
-    with open(PERFORMANCE_FILE, "w") as f:
+def save_performance(config: AgentConfig, data: dict) -> None:
+    with open(config.performance_file, "w") as f:
         json.dump(data, f, indent=2)
 
 
-def tool_get_performance_report() -> str:
-    data = load_performance()
-    if not data.get("units"):
-        return "No performance data yet — start practicing to build your report!"
-    lines = ["Performance Report:"]
-    for unit in UNITS:
-        u = data["units"].get(unit, {})
-        level = u.get("level", 0)
-        total = u.get("total", 0)
-        correct = u.get("correct", 0)
-        if total > 0:
-            acc = int((correct / total) * 100)
-            lines.append(f"• {unit}: Level {level} ({LEVEL_NAMES[level]}) — {acc}% accuracy ({correct}/{total})")
-        else:
-            lines.append(f"• {unit}: Not yet tested")
-    return "\n".join(lines)
-
-
-def load_weak_topics() -> list[dict]:
-    if not os.path.exists(WEAK_TOPICS_FILE):
+def load_weak_topics(config: AgentConfig) -> list:
+    if not os.path.exists(config.weak_topics_file):
         return []
-    with open(WEAK_TOPICS_FILE) as f:
+    with open(config.weak_topics_file) as f:
         return json.load(f)
 
 
-def save_weak_topics(topics: list[dict]) -> None:
-    with open(WEAK_TOPICS_FILE, "w") as f:
+def save_weak_topics(config: AgentConfig, topics: list) -> None:
+    with open(config.weak_topics_file, "w") as f:
         json.dump(topics, f, indent=2)
 
 
-def tool_save_weak_topic(topic: str, note: str) -> str:
-    topics = load_weak_topics()
-    entry = {
-        "topic": topic,
-        "note": note,
-        "logged_at": datetime.now().isoformat()
-    }
-    # Avoid exact duplicates
-    if not any(t["topic"].lower() == topic.lower() for t in topics):
-        topics.append(entry)
-        save_weak_topics(topics)
-        return f"✓ Logged '{topic}' as a topic to review."
-    else:
-        return f"'{topic}' is already in the review list."
+def _local_get_today(config: AgentConfig) -> int:
+    if not os.path.exists(config.daily_progress_file):
+        return 0
+    with open(config.daily_progress_file) as f:
+        data = json.load(f)
+    return data.get(date.today().isoformat(), 0)
 
 
-def tool_get_weak_topics() -> str:
-    topics = load_weak_topics()
-    if not topics:
-        return "No weak topics logged yet — great start!"
-    lines = [f"• {t['topic']}: {t['note']}" for t in topics]
-    return "Topics to review:\n" + "\n".join(lines)
+def _local_increment_today(config: AgentConfig) -> int:
+    today = date.today().isoformat()
+    data = {}
+    if os.path.exists(config.daily_progress_file):
+        with open(config.daily_progress_file) as f:
+            data = json.load(f)
+    data[today] = data.get(today, 0) + 1
+    with open(config.daily_progress_file, "w") as f:
+        json.dump(data, f, indent=2)
+    return data[today]
 
-
-def tool_get_study_schedule() -> str:
-    today = date.today()
-    days_left = (EXAM_DATE - today).days
-    weak_topics = load_weak_topics()
-    weak_names = [t["topic"] for t in weak_topics]
-
-    schedule_lines = [
-        f"📅 AP Physics 1 Exam: {EXAM_DATE.strftime('%B %d, %Y')} ({days_left} days away)\n"
-    ]
-
-    # High-priority units by weight
-    priority_units = [
-        ("Forces & Newton's Laws", "18%"),
-        ("Energy", "17%"),
-        ("Momentum & Impulse", "12%"),
-        ("Torque & Rotational Motion", "12%"),
-        ("DC Circuits", "10%"),
-        ("Kinematics", "10%"),
-        ("Mechanical Waves & Sound", "10%"),
-        ("Electric Charge & Force", "7%"),
-        ("Circular Motion & Gravitation", "7%"),
-        ("Simple Harmonic Motion", "5%"),
-    ]
-
-    if days_left <= 0:
-        return "The exam is today or has passed — good luck, Sasha! 🌟"
-
-    if days_left >= 10:
-        schedule_lines.append("Recommended focus areas:")
-        for i, (unit, weight) in enumerate(priority_units[:days_left]):
-            flag = " ⚠️ (flagged weak)" if any(unit.lower() in w.lower() for w in weak_names) else ""
-            schedule_lines.append(f"  Day {i+1}: {unit} ({weight}){flag}")
-        schedule_lines.append(f"\n  Last {max(1, days_left - len(priority_units))} day(s): Full practice exam + weak topic review")
-    else:
-        schedule_lines.append("Crunch-time plan:")
-        for i in range(days_left - 1):
-            unit, weight = priority_units[i % len(priority_units)]
-            flag = " ⚠️" if any(unit.lower() in w.lower() for w in weak_names) else ""
-            schedule_lines.append(f"  Day {i+1}: {unit} ({weight}){flag}")
-        schedule_lines.append(f"  Day {days_left} (exam day): Light review, rest well 🌟")
-
-    if weak_names:
-        schedule_lines.append(f"\n⚠️  Flagged for extra attention: {', '.join(weak_names)}")
-
-    return "\n".join(schedule_lines)
-
+# ── Supabase ──────────────────────────────────────────────────────────────────
 
 _supabase = None
 
@@ -356,107 +384,151 @@ def get_supabase():
     return _supabase
 
 
-DAILY_PROGRESS_FILE = "daily_progress.json"
-
-
-def _local_get_today() -> int:
-    if not os.path.exists(DAILY_PROGRESS_FILE):
-        return 0
-    with open(DAILY_PROGRESS_FILE) as f:
-        data = json.load(f)
-    return data.get(date.today().isoformat(), 0)
-
-
-def _local_increment_today() -> int:
-    today = date.today().isoformat()
-    data = {}
-    if os.path.exists(DAILY_PROGRESS_FILE):
-        with open(DAILY_PROGRESS_FILE) as f:
-            data = json.load(f)
-    data[today] = data.get(today, 0) + 1
-    with open(DAILY_PROGRESS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-    return data[today]
-
-
-def get_today_questions() -> int:
+def get_today_questions(config: AgentConfig) -> int:
     sb = get_supabase()
     if sb:
         try:
-            result = sb.table("daily_progress").select("questions_answered").eq("date", date.today().isoformat()).execute()
+            result = (
+                sb.table("daily_progress")
+                .select("questions_answered")
+                .eq("date", date.today().isoformat())
+                .eq("subject", config.key)
+                .execute()
+            )
             return result.data[0]["questions_answered"] if result.data else 0
         except Exception:
             pass
-    return _local_get_today()
+    return _local_get_today(config)
+
+# ── Tool implementations ──────────────────────────────────────────────────────
+
+def tool_get_performance_report(config: AgentConfig) -> str:
+    data = load_performance(config)
+    if not data.get("units"):
+        return "No performance data yet — start practicing to build your report!"
+    lines = [f"Performance Report — {config.display_name}:"]
+    for unit in config.units:
+        u = data["units"].get(unit, {})
+        level   = u.get("level", 0)
+        total   = u.get("total", 0)
+        correct = u.get("correct", 0)
+        if total > 0:
+            acc = int((correct / total) * 100)
+            lines.append(f"• {unit}: Level {level} ({LEVEL_NAMES[level]}) — {acc}% ({correct}/{total})")
+        else:
+            lines.append(f"• {unit}: Not yet tested")
+    return "\n".join(lines)
 
 
-def tool_record_practice_answer(correct: bool) -> str:
+def tool_save_weak_topic(config: AgentConfig, topic: str, note: str) -> str:
+    topics = load_weak_topics(config)
+    if not any(t["topic"].lower() == topic.lower() for t in topics):
+        topics.append({"topic": topic, "note": note, "logged_at": datetime.now().isoformat()})
+        save_weak_topics(config, topics)
+        return f"✓ Logged '{topic}' as a topic to review."
+    return f"'{topic}' is already in the review list."
+
+
+def tool_get_weak_topics(config: AgentConfig) -> str:
+    topics = load_weak_topics(config)
+    if not topics:
+        return "No weak topics logged yet — great start!"
+    lines = [f"• {t['topic']}: {t['note']}" for t in topics]
+    return f"Topics to review ({config.display_name}):\n" + "\n".join(lines)
+
+
+def tool_get_study_schedule(config: AgentConfig) -> str:
+    today     = date.today()
+    days_left = (config.exam_date - today).days
+    weak      = [t["topic"] for t in load_weak_topics(config)]
+
+    if days_left <= 0:
+        return f"The {config.display_name} exam is today or has passed — good luck, Sasha! 🌟"
+
+    lines = [f"📅 {config.display_name} Exam: {config.exam_date.strftime('%B %d, %Y')} ({days_left} days away)\n"]
+    priority = sorted(config.unit_weights.items(), key=lambda x: x[1], reverse=True)
+
+    if days_left >= len(priority):
+        lines.append("Recommended focus areas:")
+        for i, (unit, w) in enumerate(priority):
+            flag = " ⚠️ (flagged weak)" if any(unit.lower() in wk.lower() for wk in weak) else ""
+            lines.append(f"  Day {i+1}: {unit} ({w}%){flag}")
+        lines.append(f"\n  Last day(s): Full practice exam + weak topic review")
+    else:
+        lines.append("Crunch-time plan:")
+        for i in range(days_left - 1):
+            unit, w = priority[i % len(priority)]
+            flag = " ⚠️" if any(unit.lower() in wk.lower() for wk in weak) else ""
+            lines.append(f"  Day {i+1}: {unit} ({w}%){flag}")
+        lines.append(f"  Day {days_left} (exam day): Light review, rest well 🌟")
+
+    if weak:
+        lines.append(f"\n⚠️ Flagged for extra attention: {', '.join(weak)}")
+    return "\n".join(lines)
+
+
+def tool_record_practice_answer(config: AgentConfig, correct: bool) -> str:
     today = date.today().isoformat()
-    sb = get_supabase()
+    sb    = get_supabase()
     if sb:
         try:
-            result = sb.table("daily_progress").select("questions_answered").eq("date", today).execute()
+            result = (
+                sb.table("daily_progress")
+                .select("questions_answered")
+                .eq("date", today)
+                .eq("subject", config.key)
+                .execute()
+            )
             if result.data:
                 count = result.data[0]["questions_answered"] + 1
-                sb.table("daily_progress").update({
-                    "questions_answered": count,
-                    "last_updated": datetime.now().isoformat()
-                }).eq("date", today).execute()
+                sb.table("daily_progress").update(
+                    {"questions_answered": count, "last_updated": datetime.now().isoformat()}
+                ).eq("date", today).eq("subject", config.key).execute()
             else:
                 count = 1
-                sb.table("daily_progress").insert({
-                    "date": today,
-                    "questions_answered": 1,
-                    "last_updated": datetime.now().isoformat()
-                }).execute()
+                sb.table("daily_progress").insert(
+                    {"date": today, "subject": config.key, "questions_answered": 1,
+                     "last_updated": datetime.now().isoformat()}
+                ).execute()
             status = "✓ Correct!" if correct else "Keep going!"
             return f"{status} ({count}/{MIN_QUESTIONS} questions done today)"
         except Exception:
             pass
-    # Local fallback
-    count = _local_increment_today()
+    count  = _local_increment_today(config)
     status = "✓ Correct!" if correct else "Keep going!"
     return f"{status} ({count}/{MIN_QUESTIONS} questions done today)"
 
 
-def execute_tool(name: str, tool_input: dict) -> str:
+def execute_tool(name: str, tool_input: dict, config: AgentConfig) -> str:
     if name == "save_weak_topic":
-        return tool_save_weak_topic(tool_input["topic"], tool_input["note"])
+        return tool_save_weak_topic(config, tool_input["topic"], tool_input["note"])
     elif name == "get_weak_topics":
-        return tool_get_weak_topics()
+        return tool_get_weak_topics(config)
     elif name == "get_study_schedule":
-        return tool_get_study_schedule()
+        return tool_get_study_schedule(config)
     elif name == "record_practice_answer":
-        return tool_record_practice_answer(tool_input["correct"])
+        return tool_record_practice_answer(config, tool_input["correct"])
     return f"Unknown tool: {name}"
 
+# ── Convenience helpers ────────────────────────────────────────────────────────
 
-# ── Conversation Loop ──────────────────────────────────────────────────────────
+def days_remaining(config: AgentConfig) -> int:
+    return (config.exam_date - date.today()).days
 
-def days_remaining() -> int:
-    return (EXAM_DATE - date.today()).days
+# ── CLI chat loop ─────────────────────────────────────────────────────────────
 
-
-def print_welcome():
-    days = days_remaining()
-    print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════╗{RESET}")
-    print(f"{BOLD}{CYAN}║       AP Physics 1 Tutor — Hi Sasha! 👋               ║{RESET}")
-    print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════╝{RESET}")
-    print(f"\n{YELLOW}📅 Exam date: May 6, 2026  ({days} days away!){RESET}")
-    print(f"{DIM}Type 'quit' to exit • Type 'topics' to see your weak areas{RESET}\n")
-    print(f"{GREEN}What would you like to work on today?{RESET}")
-    print(f"{DIM}Ideas: 'quiz me on Newton's laws', 'explain energy conservation',")
-    print(f"       'give me a hard FRQ on momentum', 'what should I study today?'{RESET}\n")
-
-
-def chat():
-    client = anthropic.Anthropic()
+def chat(config: AgentConfig):
+    client   = anthropic.Anthropic()
     messages: list[dict] = []
+    days     = days_remaining(config)
 
-    print_welcome()
+    print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════╗{RESET}")
+    print(f"{BOLD}{CYAN}║  {config.icon}  {config.display_name} Tutor — Hi Sasha! 👋{RESET}")
+    print(f"{BOLD}{CYAN}╚══════════════════════════════════════════════════════╝{RESET}")
+    print(f"\n{YELLOW}📅 Exam: {config.exam_date.strftime('%B %d, %Y')} ({days} days away!){RESET}")
+    print(f"{DIM}Type 'quit' to exit • 'topics' to see weak areas{RESET}\n")
 
     while True:
-        # Get user input
         try:
             user_input = input(f"{BOLD}{CYAN}You:{RESET} ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -465,23 +537,17 @@ def chat():
 
         if not user_input:
             continue
-
         if user_input.lower() in ("quit", "exit", "bye"):
-            print(f"\n{GREEN}Great work today! Keep it up — May 6th will be here before you know it! 🌟{RESET}\n")
+            print(f"\n{GREEN}Great work! Keep it up 🌟{RESET}\n")
             break
-
-        # Shortcut: 'topics' shows weak topics without going to the model
         if user_input.lower() == "topics":
-            print(f"\n{YELLOW}{tool_get_weak_topics()}{RESET}\n")
+            print(f"\n{YELLOW}{tool_get_weak_topics(config)}{RESET}\n")
             continue
 
         messages.append({"role": "user", "content": user_input})
 
-        # Agentic loop: keep going until the model stops calling tools
         while True:
             print(f"\n{BOLD}{GREEN}Tutor:{RESET} ", end="", flush=True)
-
-            # Stream the response
             assistant_content = []
             tool_calls = []
 
@@ -489,85 +555,56 @@ def chat():
                 model=MODEL,
                 max_tokens=4096,
                 thinking={"type": "adaptive"},
-                system=[{
-                    "type": "text",
-                    "text": SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"}
-                }],
+                system=[{"type": "text", "text": config.system_prompt, "cache_control": {"type": "ephemeral"}}],
                 tools=TOOLS,
                 messages=messages,
             ) as stream:
-                current_block_type = None
-
                 for event in stream:
-                    if event.type == "content_block_start":
-                        current_block_type = event.content_block.type
-                        if current_block_type == "tool_use":
-                            tool_calls.append({
-                                "id": event.content_block.id,
-                                "name": event.content_block.name,
-                                "input_str": ""
-                            })
-
+                    if event.type == "content_block_start" and event.content_block.type == "tool_use":
+                        tool_calls.append({"id": event.content_block.id, "name": event.content_block.name, "input_str": ""})
                     elif event.type == "content_block_delta":
                         if event.delta.type == "text_delta":
                             print(event.delta.text, end="", flush=True)
                         elif event.delta.type == "input_json_delta" and tool_calls:
                             tool_calls[-1]["input_str"] += event.delta.partial_json
-
                 final_msg = stream.get_final_message()
+            print()
 
-            print()  # newline after streamed response
-
-            # Collect content blocks for history
             for block in final_msg.content:
                 if block.type == "text":
                     assistant_content.append({"type": "text", "text": block.text})
                 elif block.type == "tool_use":
-                    assistant_content.append({
-                        "type": "tool_use",
-                        "id": block.id,
-                        "name": block.name,
-                        "input": block.input
-                    })
+                    assistant_content.append({"type": "tool_use", "id": block.id, "name": block.name, "input": block.input})
                 elif block.type == "thinking":
-                    assistant_content.append({
-                        "type": "thinking",
-                        "thinking": block.thinking,
-                        "signature": block.signature
-                    })
+                    assistant_content.append({"type": "thinking", "thinking": block.thinking, "signature": block.signature})
 
             messages.append({"role": "assistant", "content": assistant_content})
 
-            # No tool calls → we're done
             if final_msg.stop_reason != "tool_use":
                 break
 
-            # Execute tools and feed results back
             tool_results = []
             for block in final_msg.content:
                 if block.type == "tool_use":
-                    result = execute_tool(block.name, block.input)
-                    # Show tool activity as a dim note
+                    result = execute_tool(block.name, block.input, config)
                     print(f"  {DIM}[{block.name}: {result}]{RESET}")
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": result
-                    })
-
+                    tool_results.append({"type": "tool_result", "tool_use_id": block.id, "content": result})
             messages.append({"role": "user", "content": tool_results})
 
-        print()  # blank line between turns
+        print()
 
 
 # ── Entry Point ───────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Sanity check
     if not os.environ.get("ANTHROPIC_API_KEY"):
-        print(f"{RED}Error: ANTHROPIC_API_KEY environment variable not set.{RESET}")
-        print("Run: export ANTHROPIC_API_KEY='your-key-here'")
+        print(f"{RED}Error: ANTHROPIC_API_KEY not set.{RESET}")
         sys.exit(1)
 
-    chat()
+    # Pick subject from CLI arg: python agent.py calculus
+    subject = sys.argv[1] if len(sys.argv) > 1 else "physics"
+    if subject not in AGENTS:
+        print(f"{RED}Unknown subject '{subject}'. Choose: {list(AGENTS)}{RESET}")
+        sys.exit(1)
+
+    chat(AGENTS[subject])

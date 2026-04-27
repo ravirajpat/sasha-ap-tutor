@@ -17,10 +17,9 @@ import streamlit as st
 from datetime import date
 
 from agent import (
-    SYSTEM_PROMPT, TOOLS, execute_tool,
-    EXAM_DATE, UNITS, UNIT_WEIGHTS, LEVEL_NAMES, LEVEL_ICONS, DIFFICULTY_NAMES, MODEL,
+    AGENTS, TOOLS, execute_tool,
+    LEVEL_NAMES, LEVEL_ICONS, DIFFICULTY_NAMES, MODEL,
     load_performance, load_weak_topics, days_remaining,
-    tool_get_performance_report, tool_get_weak_topics, tool_get_study_schedule,
     get_today_questions, MIN_QUESTIONS,
 )
 
@@ -58,25 +57,48 @@ st.markdown(
 
 # ── Session State Init ─────────────────────────────────────────────────────────
 
-if "api_messages" not in st.session_state:
-    st.session_state.api_messages = []   # full history sent to API
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []   # (role, text) pairs for display
+if "active_agent" not in st.session_state:
+    st.session_state.active_agent = "physics"
 
 if "injected_message" not in st.session_state:
     st.session_state.injected_message = None
 
+# Per-agent chat + API history
+for _ak in AGENTS:
+    if f"api_messages_{_ak}" not in st.session_state:
+        st.session_state[f"api_messages_{_ak}"] = []
+    if f"chat_history_{_ak}" not in st.session_state:
+        st.session_state[f"chat_history_{_ak}"] = []
+
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.title("⚛️ Sasha's Tutor")
+    st.title("📚 Sasha's Tutor")
+
+    # ── Subject switcher ───────────────────────────────────────────────────────
+    st.subheader("Subject")
+    s_col1, s_col2 = st.columns(2)
+    with s_col1:
+        if st.button("⚛️ Physics 1", use_container_width=True,
+                     type="primary" if st.session_state.active_agent == "physics" else "secondary"):
+            st.session_state.active_agent = "physics"
+            st.rerun()
+    with s_col2:
+        if st.button("∫ Calculus AB", use_container_width=True,
+                     type="primary" if st.session_state.active_agent == "calculus" else "secondary"):
+            st.session_state.active_agent = "calculus"
+            st.rerun()
+
+    st.divider()
+
+    # Active config drives the rest of the sidebar
+    cfg       = AGENTS[st.session_state.active_agent]
+    days_left = days_remaining(cfg)
+    exam_str  = cfg.exam_date.strftime("%B %d, %Y")
 
     # Exam countdown
-    days_left = days_remaining()
-    exam_str = EXAM_DATE.strftime("%B %d, %Y")
     if days_left > 0:
-        st.metric("Days Until Exam", days_left, delta=f"May 6 AP Physics 1")
+        st.metric("Days Until Exam", days_left, delta=exam_str)
     elif days_left == 0:
         st.metric("Exam Day!", "TODAY 🌟")
     else:
@@ -86,37 +108,27 @@ with st.sidebar:
 
     # Unit progress dashboard
     st.subheader("Unit Progress")
-    data = load_performance()
+    data = load_performance(cfg)
 
     LEVEL_COLORS = {
-        0: "#888888",
-        1: "#e74c3c",
-        2: "#e67e22",
-        3: "#f1c40f",
-        4: "#2ecc71",
-        5: "#00b4d8",
+        0: "#888888", 1: "#e74c3c", 2: "#e67e22",
+        3: "#f1c40f", 4: "#2ecc71", 5: "#00b4d8",
     }
 
-    for unit in UNITS:
-        u = data["units"].get(unit, {})
-        level = u.get("level", 0)
-        total = u.get("total", 0)
+    for unit in cfg.units:
+        u       = data["units"].get(unit, {})
+        level   = u.get("level", 0)
+        total   = u.get("total", 0)
         correct = u.get("correct", 0)
-        weight = UNIT_WEIGHTS.get(unit, 0)
-        color = LEVEL_COLORS[level]
-        bar = LEVEL_ICONS.get(level, "○○○○○")
-        label = LEVEL_NAMES.get(level, "Untested") if level > 0 else "Untested"
-
-        if total > 0:
-            acc = int((correct / total) * 100)
-            caption = f"{acc}% · {label}"
-        else:
-            caption = "Not yet tested"
-
-        short_name = unit.replace("& ", "").replace("'s", "s")
+        weight  = cfg.unit_weights.get(unit, 0)
+        color   = LEVEL_COLORS[level]
+        bar     = LEVEL_ICONS.get(level, "○○○○○")
+        lbl     = LEVEL_NAMES.get(level, "Untested") if level > 0 else "Untested"
+        caption = f"{int((correct/total)*100)}% · {lbl}" if total > 0 else "Not yet tested"
+        short   = unit.replace("& ", "").replace("'s", "s")
         st.markdown(
             f"<div style='margin-bottom:4px'>"
-            f"<span style='font-size:0.78em;color:#ccc'>{short_name} <span style='color:#888'>({weight}%)</span></span><br>"
+            f"<span style='font-size:0.78em;color:#ccc'>{short} <span style='color:#888'>({weight}%)</span></span><br>"
             f"<span style='font-family:monospace;color:{color}'>{bar}</span> "
             f"<span style='font-size:0.75em;color:#aaa'>{caption}</span>"
             f"</div>",
@@ -126,7 +138,7 @@ with st.sidebar:
     # Daily practice progress
     st.divider()
     st.subheader("Today's Practice")
-    q_done = get_today_questions()
+    q_done = get_today_questions(cfg)
     st.progress(min(q_done / MIN_QUESTIONS, 1.0))
     if q_done >= MIN_QUESTIONS:
         st.success(f"✅ {q_done}/{MIN_QUESTIONS} questions — great work today!")
@@ -134,7 +146,7 @@ with st.sidebar:
         st.warning(f"⚠️ {q_done}/{MIN_QUESTIONS} questions answered today")
 
     # Weak topics expander
-    topics = load_weak_topics()
+    topics = load_weak_topics(cfg)
     if topics:
         st.divider()
         with st.expander(f"⚠️ Weak Topics ({len(topics)})"):
@@ -258,8 +270,8 @@ FORMULA_SHEET = {
 
 # ── Main Area ──────────────────────────────────────────────────────────────────
 
-st.title("AP Physics 1 Tutor")
-st.caption(f"Hi Sasha! You have **{days_left} days** until your exam on {exam_str}. Let's get to work! 💪")
+st.title(f"{cfg.icon} {cfg.display_name} Tutor")
+st.caption(f"Hi Sasha! You have **{days_left} days** until your {cfg.display_name} exam on {exam_str}. Let's get to work! 💪")
 
 # Quick actions — always visible above the tabs
 qa1, qa2, qa3, qa4 = st.columns(4)
@@ -441,32 +453,45 @@ with tab_calc:
 # ── Chat Tab ───────────────────────────────────────────────────────────────────
 
 with tab_chat:
-    # Welcome message on first load
-    if not st.session_state.chat_history:
+    agent_key   = st.session_state.active_agent
+    chat_key    = f"chat_history_{agent_key}"
+    api_key_ss  = f"api_messages_{agent_key}"
+
+    # Welcome message on first load (per subject)
+    if not st.session_state[chat_key]:
+        if agent_key == "physics":
+            starter = "*'Test me on Energy'* or *'Give me a hard FRQ on Momentum'* or *'What should I study today?'*"
+        else:
+            starter = "*'Quiz me on derivatives'* or *'Explain the chain rule'* or *'Give me an FRQ on integrals'*"
         welcome = (
-            f"Hi Sasha! 👋 I'm your AP Physics 1 tutor. You have **{days_left} days** until your exam on **{exam_str}**.\n\n"
+            f"Hi Sasha! 👋 I'm your {cfg.display_name} tutor. You have **{days_left} days** until your exam on **{exam_str}**.\n\n"
             "Here's what we can do together:\n"
             "- **Diagnose** your understanding of any unit\n"
             "- **Quiz** you with MCQ and FRQ questions at your exact level\n"
             "- **Track** your progress and adjust difficulty automatically\n"
             "- **Plan** your study schedule based on what needs the most work\n\n"
-            "Try saying: *'Test me on Energy'* or *'Give me a hard FRQ on Momentum'* or *'What should I study today?'*\n\n"
+            f"Try saying: {starter}\n\n"
             "_Tip: click the **📐 Formula Sheet** tab anytime to look up a formula while you practice!_"
         )
-        st.session_state.chat_history.append(("assistant", welcome))
+        st.session_state[chat_key].append(("assistant", welcome))
 
-    # Render chat history
-    for role, text in st.session_state.chat_history:
+    # Render chat history for this subject
+    for role, text in st.session_state[chat_key]:
         with st.chat_message(role, avatar="🎓" if role == "assistant" else "👩‍🎓"):
             st.markdown(text)
 
     # ── Message Handling ───────────────────────────────────────────────────────
 
     def run_agent(user_text: str):
+        ak  = st.session_state.active_agent
+        c   = AGENTS[ak]
+        chk = f"chat_history_{ak}"
+        apk = f"api_messages_{ak}"
+
         with st.chat_message("user", avatar="👩‍🎓"):
             st.markdown(user_text)
-        st.session_state.chat_history.append(("user", user_text))
-        st.session_state.api_messages.append({"role": "user", "content": user_text})
+        st.session_state[chk].append(("user", user_text))
+        st.session_state[apk].append({"role": "user", "content": user_text})
 
         try:
             api_key = st.secrets["ANTHROPIC_API_KEY"]
@@ -490,18 +515,17 @@ with tab_chat:
                     thinking={"type": "adaptive"},
                     system=[{
                         "type": "text",
-                        "text": SYSTEM_PROMPT,
+                        "text": c.system_prompt,
                         "cache_control": {"type": "ephemeral"},
                     }],
                     tools=TOOLS,
-                    messages=st.session_state.api_messages,
+                    messages=st.session_state[apk],
                 ) as stream:
                     for event in stream:
                         if event.type == "content_block_delta":
                             if event.delta.type == "text_delta":
                                 full_text += event.delta.text
                                 placeholder.markdown(full_text + "▌")
-
                     final_msg = stream.get_final_message()
 
                 if full_text:
@@ -514,10 +538,8 @@ with tab_chat:
                         assistant_content.append({"type": "text", "text": block.text})
                     elif block.type == "tool_use":
                         assistant_content.append({
-                            "type": "tool_use",
-                            "id": block.id,
-                            "name": block.name,
-                            "input": block.input,
+                            "type": "tool_use", "id": block.id,
+                            "name": block.name, "input": block.input,
                         })
                     elif block.type == "thinking":
                         assistant_content.append({
@@ -532,7 +554,7 @@ with tab_chat:
                         if block.type == "tool_use":
                             tool_label = block.name.replace("_", " ").title()
                             with st.status(f"Using tool: {tool_label}…", expanded=False) as status:
-                                result = execute_tool(block.name, block.input)
+                                result = execute_tool(block.name, block.input, c)
                                 status.update(label=f"✓ {tool_label}", state="complete")
                             tool_results.append({
                                 "type": "tool_result",
@@ -540,21 +562,26 @@ with tab_chat:
                                 "content": result,
                             })
 
-            st.session_state.api_messages.append({"role": "assistant", "content": assistant_content})
+            st.session_state[apk].append({"role": "assistant", "content": assistant_content})
 
             if final_msg.stop_reason != "tool_use":
                 if full_text:
-                    st.session_state.chat_history.append(("assistant", full_text))
+                    st.session_state[chk].append(("assistant", full_text))
                 break
 
-            st.session_state.api_messages.append({"role": "user", "content": tool_results})
+            st.session_state[apk].append({"role": "user", "content": tool_results})
 
-    # Handle injected message (from sidebar buttons)
+    # Handle injected message (from quick-action buttons)
     if st.session_state.injected_message:
         msg = st.session_state.injected_message
         st.session_state.injected_message = None
         run_agent(msg)
 
     # Handle typed input
-    if prompt := st.chat_input("Ask me anything, or say 'test me on Energy'…"):
+    placeholder_text = (
+        "Ask me anything, or say 'test me on Energy'…"
+        if agent_key == "physics"
+        else "Ask me anything, or say 'quiz me on derivatives'…"
+    )
+    if prompt := st.chat_input(placeholder_text):
         run_agent(prompt)
