@@ -24,5 +24,6 @@ jobs:
           GMAIL_USER:         ${{ secrets.GMAIL_USER }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           SASHA_EMAIL:        ${{ secrets.SASHA_EMAIL }}
+          PARENT_EMAIL:       ${{ secrets.PARENT_EMAIL }}
           APP_URL:            ${{ secrets.APP_URL }}
         run: python Sasha_AP/daily_quiz.py
