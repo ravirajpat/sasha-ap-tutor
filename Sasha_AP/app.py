@@ -51,10 +51,31 @@ st.markdown(
     .block-container { padding-top: 1rem !important; }
     section[data-testid="stSidebar"] > div:first-child { padding-top: 0.75rem !important; }
 
-    /* Touch-friendly buttons on all devices */
-    .stButton > button {
-        min-height: 44px;
-        touch-action: manipulation;  /* no double-tap zoom */
+    /* ── Secondary buttons → same look as Streamlit's "Deploy" button ── */
+    button[data-testid="baseButton-secondary"] {
+        background: transparent !important;
+        border: 1px solid rgba(49,51,63,0.25) !important;
+        color: rgb(49,51,63) !important;
+        font-size: 0.8rem !important;
+        font-weight: 400 !important;
+        min-height: 30px !important;
+        padding: 2px 10px !important;
+        border-radius: 0.4rem !important;
+        touch-action: manipulation;
+    }
+    button[data-testid="baseButton-secondary"]:hover {
+        background: rgba(49,51,63,0.06) !important;
+        border-color: rgba(49,51,63,0.4) !important;
+    }
+    /* Sidebar subject switcher needs a bit more breathing room */
+    section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
+        font-size: 0.85rem !important;
+        min-height: 38px !important;
+        padding: 4px 12px !important;
+    }
+    /* Primary buttons (sidebar active subject, calculator = ) keep default Streamlit style */
+    button[data-testid="baseButton-primary"] {
+        touch-action: manipulation;
     }
 
     /* Tabs: horizontal scroll so they never wrap/overflow on small screens */
@@ -64,24 +85,6 @@ st.markdown(
         -webkit-overflow-scrolling: touch;
     }
 
-    /* ── Tablet (≤ 900px) ── */
-    @media screen and (max-width: 900px) {
-        .block-container {
-            padding-left: 0.75rem !important;
-            padding-right: 0.75rem !important;
-        }
-        /* Allow Streamlit columns to wrap */
-        [data-testid="stHorizontalBlock"] {
-            flex-wrap: wrap !important;
-            gap: 6px !important;
-        }
-        /* 2 per row on tablet — quick actions become 2×2, formula cols stay 2 */
-        [data-testid="column"] {
-            min-width: calc(50% - 6px) !important;
-            flex: 1 1 calc(50% - 6px) !important;
-        }
-    }
-
     /* ── Mobile (≤ 600px) ── */
     @media screen and (max-width: 600px) {
         .block-container {
@@ -89,17 +92,10 @@ st.markdown(
             padding-right: 0.5rem !important;
             max-width: 100vw !important;
         }
-        /* 3 per row: works for 3-col and 5-col (calculator) grids;
-           quick actions become 2×2 via min-content / growth */
-        [data-testid="column"] {
-            min-width: calc(33% - 6px) !important;
-            flex: 1 1 calc(33% - 6px) !important;
-        }
-        /* Compact but still tap-friendly on phone */
-        .stButton > button {
-            min-height: 40px !important;
-            font-size: 0.9rem !important;
-            padding: 0.3rem 0.5rem !important;
+        /* Quick-action buttons: slightly smaller text on phone */
+        button[data-testid="baseButton-secondary"] {
+            font-size: 0.7rem !important;
+            padding: 2px 5px !important;
         }
         /* Prevent iOS auto-zoom when focusing inputs (triggers at < 16px) */
         input, textarea,
@@ -450,28 +446,28 @@ FORMULA_SHEETS = {
 
 # ── Main Area ──────────────────────────────────────────────────────────────────
 
-st.title(f"{cfg.icon} {cfg.display_name} Tutor")
-st.caption(f"Hi Sasha! You have **{days_left} days** until your {cfg.display_name} exam on {exam_str}. Let's get to work! 💪")
-
-# Quick actions — 2×2 grid, works on every screen size
-qa1, qa2 = st.columns(2)
+# Top nav bar: title left, Deploy-style action buttons right — all in one row
+title_col, qa1, qa2, qa3, qa4 = st.columns([3, 1, 1, 1, 1])
+with title_col:
+    st.markdown(f"## {cfg.icon} {cfg.display_name} Tutor")
 with qa1:
-    if st.button("📅 Schedule", use_container_width=True):
+    if st.button("📅 Schedule", use_container_width=True, key="qa_sched"):
         st.session_state.injected_message = "What's my recommended study schedule?"
         st.rerun()
 with qa2:
-    if st.button("⚠️ Weak Topics", use_container_width=True):
+    if st.button("⚠️ Weak Topics", use_container_width=True, key="qa_weak"):
         st.session_state.injected_message = "Show me my weak topics."
         st.rerun()
-qa3, qa4 = st.columns(2)
 with qa3:
-    if st.button("📊 Report", use_container_width=True):
+    if st.button("📊 Report", use_container_width=True, key="qa_rpt"):
         st.session_state.injected_message = "Give me my full progress report."
         st.rerun()
 with qa4:
-    if st.button("🧪 Diagnose", use_container_width=True):
+    if st.button("🧪 Diagnose", use_container_width=True, key="qa_diag"):
         st.session_state.injected_message = "Run a full diagnostic and tell me what to study first."
         st.rerun()
+
+st.caption(f"Hi Sasha! You have **{days_left} days** until your {cfg.display_name} exam on {exam_str}. Let's get to work! 💪")
 
 tab_chat, tab_formulas, tab_calc = st.tabs(["💬 Chat", "📐 Formula Sheet", "🔢 Calculator"])
 
@@ -615,20 +611,16 @@ with tab_calc:
         [("0","0"),      (".","."  ),        ("=","="),       ("+","+")],
     ]
 
-    HIGHLIGHT = {"=": "#4e9af1", "C": "#e05c5c"}
+    # "=" gets primary style (filled); everything else uses secondary (Deploy-like)
+    PRIMARY_VALS = {"="}
 
     for r_idx, row in enumerate(ROWS):
         cols = st.columns(len(row))
         for c_idx, (label, val) in enumerate(row):
-            bg = HIGHLIGHT.get(val, "#262730")
+            btn_type = "primary" if val in PRIMARY_VALS else "secondary"
             with cols[c_idx]:
-                st.markdown(
-                    f"<style>#calc_btn_{r_idx}_{c_idx} button{{"
-                    f"background-color:{bg}!important;"
-                    f"font-size:1.05em!important;font-weight:600!important}}</style>",
-                    unsafe_allow_html=True,
-                )
-                if st.button(label, key=f"calc_btn_{r_idx}_{c_idx}", use_container_width=True):
+                if st.button(label, key=f"calc_btn_{r_idx}_{c_idx}",
+                             use_container_width=True, type=btn_type):
                     _calc_press(val)
                     st.rerun()
 
