@@ -44,6 +44,21 @@ st.set_page_config(
 st.markdown(
     """
     <style>
+    /* ── Skip link (keyboard / screen reader accessibility) ── */
+    .skip-link {
+        position: absolute;
+        left: -9999px;
+        top: 0.5rem;
+        z-index: 9999;
+        background: #4e9af1;
+        color: #fff !important;
+        padding: 0.4rem 0.9rem;
+        border-radius: 0.4rem;
+        font-size: 0.85rem;
+        text-decoration: none;
+    }
+    .skip-link:focus { left: 1rem; }
+
     /* ── Base ── */
     /* Hide only the coloured decoration stripe, keep the toolbar (Deploy, menu) */
     [data-testid="stDecoration"] { display: none !important; }
@@ -54,7 +69,7 @@ st.markdown(
     /* ── Secondary buttons → same look as Streamlit's "Deploy" button ── */
     button[data-testid="baseButton-secondary"] {
         background: transparent !important;
-        border: 1px solid rgba(49,51,63,0.25) !important;
+        border: 1px solid rgba(49,51,63,0.5) !important;
         color: rgb(49,51,63) !important;
         font-size: 0.8rem !important;
         font-weight: 400 !important;
@@ -64,8 +79,13 @@ st.markdown(
         touch-action: manipulation;
     }
     button[data-testid="baseButton-secondary"]:hover {
-        background: rgba(49,51,63,0.06) !important;
-        border-color: rgba(49,51,63,0.4) !important;
+        background: rgba(49,51,63,0.08) !important;
+        border-color: rgba(49,51,63,0.7) !important;
+    }
+    /* Keyboard focus: visible outline for keyboard navigation */
+    button:focus-visible {
+        outline: 2px solid #4e9af1 !important;
+        outline-offset: 2px !important;
     }
     /* Sidebar subject switcher needs a bit more breathing room */
     section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
@@ -96,6 +116,12 @@ st.markdown(
         button[data-testid="baseButton-secondary"] {
             font-size: 0.7rem !important;
             padding: 2px 5px !important;
+        }
+        /* Calculator buttons: 44px minimum touch target (Apple HIG / WCAG 2.5.5) */
+        [data-testid="stTabsContent"] button[data-testid="baseButton-secondary"],
+        [data-testid="stTabsContent"] button[data-testid="baseButton-primary"] {
+            min-height: 44px !important;
+            font-size: 1rem !important;
         }
         /* Prevent iOS auto-zoom when focusing inputs (triggers at < 16px) */
         input, textarea,
@@ -446,28 +472,45 @@ FORMULA_SHEETS = {
 
 # ── Main Area ──────────────────────────────────────────────────────────────────
 
-# Top nav bar: title left, Deploy-style action buttons right — all in one row
+# Skip-to-content link (keyboard users tab to it; visually hidden until focused)
+st.markdown('<a class="skip-link" href="#main-content">Skip to chat</a>', unsafe_allow_html=True)
+
+# Fetch today's count here so it shows in the main area status line
+_q_today = get_today_questions(cfg)
+_goal_icon = "✅" if _q_today >= MIN_QUESTIONS else "📝"
+
+# Top nav bar: compact status title left, Deploy-style action buttons right
 title_col, qa1, qa2, qa3, qa4 = st.columns([3, 1, 1, 1, 1])
 with title_col:
-    st.markdown(f"## {cfg.icon} {cfg.display_name} Tutor")
+    st.markdown(
+        f"<div style='display:flex;align-items:baseline;gap:0.6rem;flex-wrap:wrap;padding:6px 0 2px'>"
+        f"<span style='font-size:1.25rem;font-weight:700;line-height:1.2'>{cfg.icon} {cfg.display_name} Tutor</span>"
+        f"<span style='font-size:0.78rem;color:#888;white-space:nowrap' title='Days until exam'>⏳ {days_left}d left</span>"
+        f"<span style='font-size:0.78rem;color:#888;white-space:nowrap' "
+        f"title='Questions answered today vs daily goal'>{_goal_icon} {_q_today}/{MIN_QUESTIONS} today</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 with qa1:
-    if st.button("📅 Schedule", use_container_width=True, key="qa_sched"):
+    if st.button("📅 Schedule", use_container_width=True, key="qa_sched",
+                 help="Get a personalised study schedule based on your weak areas"):
         st.session_state.injected_message = "What's my recommended study schedule?"
         st.rerun()
 with qa2:
-    if st.button("⚠️ Weak Topics", use_container_width=True, key="qa_weak"):
+    if st.button("⚠️ Weak Topics", use_container_width=True, key="qa_weak",
+                 help="See which topics need the most practice right now"):
         st.session_state.injected_message = "Show me my weak topics."
         st.rerun()
 with qa3:
-    if st.button("📊 Report", use_container_width=True, key="qa_rpt"):
+    if st.button("📊 Report", use_container_width=True, key="qa_rpt",
+                 help="View your full progress report across all units"):
         st.session_state.injected_message = "Give me my full progress report."
         st.rerun()
 with qa4:
-    if st.button("🧪 Diagnose", use_container_width=True, key="qa_diag"):
+    if st.button("🧪 Diagnose", use_container_width=True, key="qa_diag",
+                 help="Run a diagnostic to find your biggest knowledge gaps"):
         st.session_state.injected_message = "Run a full diagnostic and tell me what to study first."
         st.rerun()
-
-st.caption(f"Hi Sasha! You have **{days_left} days** until your {cfg.display_name} exam on {exam_str}. Let's get to work! 💪")
 
 tab_chat, tab_formulas, tab_calc = st.tabs(["💬 Chat", "📐 Formula Sheet", "🔢 Calculator"])
 
@@ -487,21 +530,24 @@ with tab_formulas:
         tip   = unit_data["tips"]
         rows  = "".join(
             f"<tr>"
-            f"<td style='color:#aaa;font-size:0.8em;padding:3px 10px 3px 0;"
+            f"<td style='color:#bbb;font-size:0.8em;padding:3px 10px 3px 0;"
             f"white-space:nowrap;vertical-align:top'>{lbl}</td>"
             f"<td style='font-family:monospace;font-size:0.88em;padding:3px 0;"
-            f"word-break:break-word'>{fml}</td>"
+            f"color:#f0f0f0;word-break:break-word'>{fml}</td>"
             f"</tr>"
             for lbl, fml in unit_data["formulas"]
         )
         cards_html += (
-            f"<div style='background:#0e1117;border:1px solid #1e1e2e;"
+            f"<div role='region' aria-label='{unit_name} formulas' "
+            f"style='background:#0e1117;border:1px solid #2a2a3e;"
             f"border-radius:10px;padding:14px 16px;'>"
             f"<div style='border-left:4px solid {color};padding:4px 10px;margin-bottom:8px'>"
-            f"<span style='font-size:1em;font-weight:700;color:{color}'>{icon} {unit_name}</span>"
+            f"<span role='heading' aria-level='3' "
+            f"style='font-size:1em;font-weight:700;color:{color}'>{icon} {unit_name}</span>"
             f"</div>"
-            f"<table style='width:100%;border-collapse:collapse'>{rows}</table>"
-            f"<div style='font-size:0.78em;color:#888;background:#12121f;"
+            f"<table style='width:100%;border-collapse:collapse' role='table' "
+            f"aria-label='{unit_name} formula table'>{rows}</table>"
+            f"<div role='note' style='font-size:0.78em;color:#b0b0b0;background:#12121f;"
             f"border-radius:5px;padding:6px 9px;margin-top:8px'>💡 {tip}</div>"
             f"</div>"
         )
@@ -631,6 +677,7 @@ with tab_calc:
 # ── Chat Tab ───────────────────────────────────────────────────────────────────
 
 with tab_chat:
+    st.markdown('<div id="main-content"></div>', unsafe_allow_html=True)
     agent_key   = st.session_state.active_agent
     chat_key    = f"chat_history_{agent_key}"
     api_key_ss  = f"api_messages_{agent_key}"
