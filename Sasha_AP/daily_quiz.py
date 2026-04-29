@@ -133,7 +133,7 @@ def send_quiz_email(cfg, topic: str) -> None:
     msg["Cc"]      = ", ".join(PARENT_EMAILS)
     msg.attach(MIMEText(html, "html"))
 
-    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=30) as server:
         server.login(GMAIL_USER, GMAIL_PASSWORD)
         server.send_message(msg, to_addrs=[SASHA_EMAIL] + PARENT_EMAILS)
 
