@@ -6,6 +6,7 @@ AP Exam Prep — Multi-Agent: Physics 1 & Calculus AB
 import anthropic
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -79,6 +80,64 @@ TOOLS = [
         },
     },
 ]
+
+_GENERATE_PRACTICE_TEST_TOOL = {
+    "name": "generate_practice_test",
+    "description": (
+        "Generate a printable practice test PDF and a separate answer key PDF. "
+        "Call AFTER you have composed all questions and full answers/explanations. "
+        "The two PDFs are saved to practice_tests/ and ready to print."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "title": {
+                "type": "string",
+                "description": "Test title, e.g. 'Unit 5 Practice Test' or 'Related Rates Practice Test'",
+            },
+            "scope": {
+                "type": "string",
+                "description": "What the test covers, e.g. 'Unit 5: Analytical Applications of Differentiation' or 'Topic: Related Rates (Unit 4)'",
+            },
+            "mcq_questions": {
+                "type": "array",
+                "description": "Multiple choice questions (aim for 8-12)",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "number":         {"type": "integer"},
+                        "question":       {"type": "string"},
+                        "choices":        {
+                            "type": "array",
+                            "description": "Exactly 4 choices, each starting with 'A) ', 'B) ', 'C) ', 'D) '",
+                            "items": {"type": "string"},
+                        },
+                        "correct_answer": {"type": "string", "description": "Just the letter: A, B, C, or D"},
+                        "explanation":    {"type": "string", "description": "Step-by-step solution"},
+                    },
+                    "required": ["number", "question", "choices", "correct_answer", "explanation"],
+                },
+            },
+            "frq_questions": {
+                "type": "array",
+                "description": "Free response questions (aim for 2)",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "number":   {"type": "integer"},
+                        "question": {"type": "string", "description": "Full question text including all parts (a), (b), (c)..."},
+                        "solution": {"type": "string", "description": "Complete worked solution for all parts"},
+                    },
+                    "required": ["number", "question", "solution"],
+                },
+            },
+        },
+        "required": ["title", "scope", "mcq_questions", "frq_questions"],
+    },
+}
+
+# Calculus gets all shared tools plus the practice-test generator
+CALCULUS_TOOLS = TOOLS + [_GENERATE_PRACTICE_TEST_TOOL]
 
 # ── System Prompts ─────────────────────────────────────────────────────────────
 
@@ -243,11 +302,22 @@ For FRQs, walk through each part after she attempts it.
 - Celebrate! "Yes! Exactly right 🎉"
 - Ask a quick follow-up to solidify understanding
 
+## Skill: Generate Practice Test (PDF)
+When Sasha asks for a practice test on a unit or a specific topic:
+1. Compose **10 MCQ** and **2 FRQ** questions appropriate for that scope.
+   - MCQ: clear question, 4 choices (A/B/C/D), one correct answer, step-by-step explanation.
+   - FRQ: multi-part problem (a/b/c), complete worked solution for all parts.
+   - Use ASCII math notation so it renders cleanly in print: x^2 not x², d/dx not derivative symbols, integral(...) or just write it out.
+2. Call `generate_practice_test` with all the composed content.
+   - It saves a **test PDF** (questions only, with work space) and an **answer key PDF** (answers + explanations in green).
+3. Tell Sasha the file paths so she can open and print them.
+
 ## Tools You Have
 - `save_weak_topic`: Call whenever Sasha struggles. Be proactive.
 - `get_weak_topics`: Call when she asks for a review of weak areas.
 - `get_study_schedule`: Call when she asks what to study today.
 - `record_practice_answer`: Call EVERY TIME she submits an answer.
+- `generate_practice_test`: Call after composing a full set of questions to produce printable PDFs.
 
 Always be encouraging. Calculus is beautiful, and Sasha can absolutely do this!"""
 
@@ -515,6 +585,123 @@ def tool_record_practice_answer(config: AgentConfig, correct: bool) -> str:
     return f"{status} ({count}/{MIN_QUESTIONS} questions done today)"
 
 
+_FONT_ARIAL_UNICODE = "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"
+_FONT_ARIAL_BOLD    = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+
+
+def _build_pdf(path: str, title: str, scope: str,
+               mcq_questions: list, frq_questions: list,
+               include_answers: bool) -> None:
+    from fpdf import FPDF
+
+    MARGIN = 20    # mm
+    LINE_H = 7     # mm per line
+
+    pdf = FPDF(format="Letter")
+    pdf.set_margins(MARGIN, MARGIN, MARGIN)
+    pdf.set_auto_page_break(auto=True, margin=MARGIN)
+
+    pdf.add_font("AU",  fname=_FONT_ARIAL_UNICODE)
+    pdf.add_font("AUB", fname=_FONT_ARIAL_BOLD)
+
+    W = pdf.epw   # effective page width (after margins) — set after add_page below
+
+    pdf.add_page()
+    W = pdf.epw
+
+    def mc(font, size, text, color=(0, 0, 0), indent=0):
+        """multi_cell helper: always resets x to left margin + indent."""
+        pdf.set_font(font, size=size)
+        pdf.set_text_color(*color)
+        pdf.set_x(MARGIN + indent)
+        pdf.multi_cell(W - indent, LINE_H, text, new_x="LMARGIN", new_y="NEXT")
+
+    # ── Header ──────────────────────────────────────────────────────────────
+    label = "ANSWER KEY" if include_answers else "PRACTICE TEST"
+    mc("AUB", 16, f"AP Calculus AB  —  {label}")
+    mc("AU",  12, title)
+    mc("AU",  11, f"Scope: {scope}")
+    mc("AU",  11, f"Date: {date.today().strftime('%B %d, %Y')}")
+    pdf.ln(2)
+    pdf.set_draw_color(60, 60, 60)
+    pdf.set_line_width(0.5)
+    pdf.line(MARGIN, pdf.get_y(), MARGIN + W, pdf.get_y())
+    pdf.ln(4)
+
+    if not include_answers:
+        mc("AU", 11, "Name: ____________________________    Date: ____________    Period: _____")
+        pdf.ln(3)
+
+    # ── Part I: MCQ ─────────────────────────────────────────────────────────
+    if mcq_questions:
+        mc("AUB", 13, f"Part I: Multiple Choice  ({len(mcq_questions)} questions)")
+        if not include_answers:
+            mc("AU", 10, "Circle the letter of the best answer.")
+        pdf.ln(2)
+
+        for q in mcq_questions:
+            mc("AUB", 11, f"{q['number']}.  {q['question']}")
+            for choice in q.get("choices", []):
+                mc("AU", 11, choice, indent=8)
+            if include_answers:
+                mc("AUB", 11, f"Answer: {q['correct_answer']}", color=(0, 120, 0), indent=8)
+                mc("AU",  11, q["explanation"], color=(0, 100, 0), indent=8)
+                pdf.set_text_color(0, 0, 0)
+            pdf.ln(3)
+
+    # ── Part II: FRQ ────────────────────────────────────────────────────────
+    if frq_questions:
+        pdf.add_page()
+        mc("AUB", 13, f"Part II: Free Response  ({len(frq_questions)} questions)")
+        if not include_answers:
+            mc("AU", 10, "Show all work. Answers without supporting work may not receive full credit.")
+        pdf.ln(3)
+
+        for q in frq_questions:
+            mc("AUB", 11, f"{q['number']}.  {q['question']}")
+            pdf.ln(2)
+            if include_answers:
+                for line in q["solution"].splitlines():
+                    mc("AU", 11, line if line.strip() else " ", color=(0, 100, 0), indent=5)
+                pdf.set_text_color(0, 0, 0)
+            else:
+                # Ruled work space
+                pdf.set_draw_color(200, 200, 200)
+                for _ in range(10):
+                    y = pdf.get_y() + LINE_H
+                    pdf.line(MARGIN, y, MARGIN + W, y)
+                    pdf.ln(LINE_H)
+            pdf.ln(5)
+
+    pdf.output(path)
+
+
+def tool_generate_practice_test(config: AgentConfig, title: str, scope: str,
+                                 mcq_questions: list, frq_questions: list) -> str:
+    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "practice_tests")
+    os.makedirs(out_dir, exist_ok=True)
+
+    safe = re.sub(r'[^\w]', '_', title)[:40].strip('_')
+    ts   = datetime.now().strftime("%Y%m%d_%H%M")
+    test_path = os.path.join(out_dir, f"{safe}_{ts}.pdf")
+    key_path  = os.path.join(out_dir, f"{safe}_{ts}_ANSWER_KEY.pdf")
+
+    try:
+        _build_pdf(test_path, title, scope, mcq_questions, frq_questions, include_answers=False)
+        _build_pdf(key_path,  title, scope, mcq_questions, frq_questions, include_answers=True)
+    except ImportError:
+        return "PDF generation requires fpdf2. Install with: pip install fpdf2"
+    except Exception as e:
+        return f"Error generating PDFs: {e}"
+
+    return (
+        f"Practice test saved!\n"
+        f"  Test:       {test_path}\n"
+        f"  Answer Key: {key_path}\n"
+        f"  ({len(mcq_questions)} MCQ + {len(frq_questions)} FRQ)"
+    )
+
+
 def execute_tool(name: str, tool_input: dict, config: AgentConfig) -> str:
     if name == "save_weak_topic":
         return tool_save_weak_topic(config, tool_input["topic"], tool_input["note"])
@@ -524,6 +711,14 @@ def execute_tool(name: str, tool_input: dict, config: AgentConfig) -> str:
         return tool_get_study_schedule(config)
     elif name == "record_practice_answer":
         return tool_record_practice_answer(config, tool_input["correct"])
+    elif name == "generate_practice_test":
+        return tool_generate_practice_test(
+            config,
+            tool_input["title"],
+            tool_input["scope"],
+            tool_input.get("mcq_questions", []),
+            tool_input.get("frq_questions", []),
+        )
     return f"Unknown tool: {name}"
 
 # ── Convenience helpers ────────────────────────────────────────────────────────
@@ -537,6 +732,7 @@ def chat(config: AgentConfig):
     client   = anthropic.Anthropic()
     messages: list[dict] = []
     days     = days_remaining(config)
+    tools    = CALCULUS_TOOLS if config.key == "calculus" else TOOLS
 
     print(f"\n{BOLD}{CYAN}╔══════════════════════════════════════════════════════╗{RESET}")
     print(f"{BOLD}{CYAN}║  {config.icon}  {config.display_name} Tutor — Hi Sasha! 👋{RESET}")
@@ -572,7 +768,7 @@ def chat(config: AgentConfig):
                 max_tokens=4096,
                 thinking={"type": "adaptive"},
                 system=[{"type": "text", "text": config.system_prompt, "cache_control": {"type": "ephemeral"}}],
-                tools=TOOLS,
+                tools=tools,
                 messages=messages,
             ) as stream:
                 for event in stream:

@@ -17,7 +17,7 @@ import streamlit as st
 from datetime import date
 
 from agent import (
-    AGENTS, TOOLS, execute_tool,
+    AGENTS, TOOLS, CALCULUS_TOOLS, execute_tool,
     LEVEL_NAMES, LEVEL_ICONS, DIFFICULTY_NAMES, MODEL,
     load_performance, load_weak_topics, days_remaining,
     get_today_questions, get_daily_topic, MIN_QUESTIONS,
@@ -482,6 +482,7 @@ _ACTION_MAP = {
     "weak":     "Show me my weak topics.",
     "report":   "Give me my full progress report.",
     "diagnose": "Run a full diagnostic and tell me what to study first.",
+    "practice": "Make a practice test for the topic I should study most urgently today. Include 10 MCQ and 2 FRQ, then generate the printable PDFs.",
 }
 _action = st.query_params.get("action", "")
 if _action in _ACTION_MAP:
@@ -550,6 +551,8 @@ st.markdown(
     f"<a href='?action=report' style='{_ls}' title='View full progress report'>📊 Report</a>"
     f"<span style='color:#ccc'>·</span>"
     f"<a href='?action=diagnose' style='{_ls}' title='Run a diagnostic'>🧪 Diagnose</a>"
+    + (f"<span style='color:#ccc'>·</span><a href='?action=practice' style='{_ls}' title='Generate a printable practice test PDF'>📄 Practice Test</a>"
+       if st.session_state.active_agent == "calculus" else "") +
     f"</span>"
     f"</div>",
     unsafe_allow_html=True,
@@ -729,17 +732,22 @@ with tab_chat:
     if not st.session_state[chat_key]:
         if agent_key == "physics":
             starter = "*'Test me on Energy'* or *'Give me a hard FRQ on Momentum'* or *'What should I study today?'*"
+            extra = "_Tip: click the **📐 Formula Sheet** tab anytime to look up a formula while you practice!_"
         else:
-            starter = "*'Quiz me on derivatives'* or *'Explain the chain rule'* or *'Give me an FRQ on integrals'*"
+            starter = "*'Make a practice test for Unit 5'* or *'Quiz me on derivatives'* or *'Explain the chain rule'*"
+            extra = (
+                "_Tip: click **📄 Practice Test** in the header to generate a printable PDF test + answer key. "
+                "Or ask me directly: 'Make a practice test for Related Rates'._"
+            )
         welcome = (
             f"Hi Sasha! 👋 I'm your {cfg.display_name} tutor. You have **{days_left} days** until your exam on **{exam_str}**.\n\n"
             "Here's what we can do together:\n"
             "- **Diagnose** your understanding of any unit\n"
             "- **Quiz** you with MCQ and FRQ questions at your exact level\n"
             "- **Track** your progress and adjust difficulty automatically\n"
-            "- **Plan** your study schedule based on what needs the most work\n\n"
-            f"Try saying: {starter}\n\n"
-            "_Tip: click the **📐 Formula Sheet** tab anytime to look up a formula while you practice!_"
+            "- **Plan** your study schedule based on what needs the most work\n"
+            + ("- **Generate** a printable practice test PDF + answer key for any unit or topic\n" if agent_key == "calculus" else "") +
+            f"\nTry saying: {starter}\n\n{extra}"
         )
         st.session_state[chat_key].append(("assistant", welcome))
 
@@ -777,6 +785,7 @@ with tab_chat:
             with st.chat_message("assistant", avatar="🎓"):
                 placeholder = st.empty()
 
+                agent_tools = CALCULUS_TOOLS if c.key == "calculus" else TOOLS
                 with client.messages.stream(
                     model=MODEL,
                     max_tokens=4096,
@@ -786,7 +795,7 @@ with tab_chat:
                         "text": c.system_prompt,
                         "cache_control": {"type": "ephemeral"},
                     }],
-                    tools=TOOLS,
+                    tools=agent_tools,
                     messages=st.session_state[apk],
                 ) as stream:
                     for event in stream:
@@ -824,6 +833,33 @@ with tab_chat:
                             with st.status(f"Using tool: {tool_label}…", expanded=False) as status:
                                 result = execute_tool(block.name, block.input, c)
                                 status.update(label=f"✓ {tool_label}", state="complete")
+                            # PDF download buttons for practice test
+                            if block.name == "generate_practice_test":
+                                import re as _re
+                                _tm = _re.search(r'Test:\s+(\S.+\.pdf)', result)
+                                _km = _re.search(r'Answer Key:\s+(\S.+\.pdf)', result)
+                                if _tm and _km:
+                                    _dc1, _dc2 = st.columns(2)
+                                    with _dc1:
+                                        _tp = _tm.group(1).strip()
+                                        if os.path.exists(_tp):
+                                            st.download_button(
+                                                "📄 Download Practice Test",
+                                                open(_tp, "rb").read(),
+                                                file_name=os.path.basename(_tp),
+                                                mime="application/pdf",
+                                                use_container_width=True,
+                                            )
+                                    with _dc2:
+                                        _kp = _km.group(1).strip()
+                                        if os.path.exists(_kp):
+                                            st.download_button(
+                                                "🔑 Download Answer Key",
+                                                open(_kp, "rb").read(),
+                                                file_name=os.path.basename(_kp),
+                                                mime="application/pdf",
+                                                use_container_width=True,
+                                            )
                             tool_results.append({
                                 "type": "tool_result",
                                 "tool_use_id": block.id,
