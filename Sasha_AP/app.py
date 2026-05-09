@@ -786,9 +786,12 @@ with tab_chat:
                 placeholder = st.empty()
 
                 agent_tools = CALCULUS_TOOLS if c.key == "calculus" else TOOLS
+                # Calculus may generate large tool calls (practice test JSON); give it more room
+                max_tok = 8192 if c.key == "calculus" else 4096
+                _in_tool_call = False
                 with client.messages.stream(
                     model=MODEL,
-                    max_tokens=4096,
+                    max_tokens=max_tok,
                     thinking={"type": "adaptive"},
                     system=[{
                         "type": "text",
@@ -799,8 +802,16 @@ with tab_chat:
                     messages=st.session_state[apk],
                 ) as stream:
                     for event in stream:
-                        if event.type == "content_block_delta":
+                        if event.type == "content_block_start":
+                            if hasattr(event, "content_block") and event.content_block.type == "tool_use":
+                                _in_tool_call = True
+                                placeholder.markdown(
+                                    (full_text + "\n\n" if full_text else "") +
+                                    "⏳ *Composing questions — this takes about 30 seconds…*"
+                                )
+                        elif event.type == "content_block_delta":
                             if event.delta.type == "text_delta":
+                                _in_tool_call = False
                                 full_text += event.delta.text
                                 placeholder.markdown(full_text + "▌")
                     final_msg = stream.get_final_message()
