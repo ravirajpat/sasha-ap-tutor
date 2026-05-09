@@ -585,8 +585,9 @@ def tool_record_practice_answer(config: AgentConfig, correct: bool) -> str:
     return f"{status} ({count}/{MIN_QUESTIONS} questions done today)"
 
 
-_FONT_ARIAL_UNICODE = "/System/Library/Fonts/Supplemental/Arial Unicode.ttf"
-_FONT_ARIAL_BOLD    = "/System/Library/Fonts/Supplemental/Arial Bold.ttf"
+_FONTS_DIR       = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
+_FONT_NORMAL     = os.path.join(_FONTS_DIR, "DejaVuSans.ttf")
+_FONT_BOLD       = os.path.join(_FONTS_DIR, "DejaVuSans-Bold.ttf")
 
 
 def _build_pdf(path: str, title: str, scope: str,
@@ -601,8 +602,8 @@ def _build_pdf(path: str, title: str, scope: str,
     pdf.set_margins(MARGIN, MARGIN, MARGIN)
     pdf.set_auto_page_break(auto=True, margin=MARGIN)
 
-    pdf.add_font("AU",  fname=_FONT_ARIAL_UNICODE)
-    pdf.add_font("AUB", fname=_FONT_ARIAL_BOLD)
+    pdf.add_font("AU",  fname=_FONT_NORMAL)
+    pdf.add_font("AUB", fname=_FONT_BOLD)
 
     W = pdf.epw   # effective page width (after margins) — set after add_page below
 
