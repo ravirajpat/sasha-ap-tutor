@@ -679,7 +679,8 @@ def _build_pdf(path: str, title: str, scope: str,
 
 def tool_generate_practice_test(config: AgentConfig, title: str, scope: str,
                                  mcq_questions: list, frq_questions: list) -> str:
-    out_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "practice_tests")
+    # Use /tmp so this works on read-only filesystems (e.g. Streamlit Cloud)
+    out_dir = os.path.join("/tmp", "sasha_practice_tests")
     os.makedirs(out_dir, exist_ok=True)
 
     safe = re.sub(r'[^\w]', '_', title)[:40].strip('_')
