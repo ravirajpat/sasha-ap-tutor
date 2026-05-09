@@ -677,6 +677,56 @@ def _build_pdf(path: str, title: str, scope: str,
     pdf.output(path)
 
 
+def _email_practice_test(title: str, scope: str, test_path: str, key_path: str,
+                          n_mcq: int, n_frq: int) -> str:
+    """Email both PDFs to Sasha. Returns a status string."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText as _MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders
+
+    gmail_user = os.environ.get("GMAIL_USER")
+    gmail_pass = os.environ.get("GMAIL_APP_PASSWORD", "").replace(" ", "")
+    sasha_email = os.environ.get("SASHA_EMAIL")
+
+    if not all([gmail_user, gmail_pass, sasha_email]):
+        return "email skipped (GMAIL_USER / GMAIL_APP_PASSWORD / SASHA_EMAIL not set)"
+
+    msg = MIMEMultipart()
+    msg["From"]    = gmail_user
+    msg["To"]      = sasha_email
+    msg["Subject"] = f"📝 Practice Test Ready: {title}"
+
+    body = (
+        f"Hi Sasha! 👋\n\n"
+        f"Your practice test is attached and ready to print!\n\n"
+        f"  📄 {title}\n"
+        f"  Scope: {scope}\n"
+        f"  {n_mcq} Multiple Choice  +  {n_frq} Free Response\n\n"
+        f"Two files attached:\n"
+        f"  1. Practice Test  — work through it without peeking!\n"
+        f"  2. Answer Key     — check your work after.\n\n"
+        f"Good luck! You've got this 🌟\n\n"
+        f"— Your AP Calculus Tutor"
+    )
+    msg.attach(_MIMEText(body, "plain"))
+
+    for path in [test_path, key_path]:
+        with open(path, "rb") as f:
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(f.read())
+        encoders.encode_base64(part)
+        part.add_header("Content-Disposition", f'attachment; filename="{os.path.basename(path)}"')
+        msg.attach(part)
+
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as server:
+        server.login(gmail_user, gmail_pass)
+        server.send_message(msg)
+
+    return f"emailed to {sasha_email}"
+
+
 def tool_generate_practice_test(config: AgentConfig, title: str, scope: str,
                                  mcq_questions: list, frq_questions: list) -> str:
     # Use /tmp so this works on read-only filesystems (e.g. Streamlit Cloud)
@@ -696,11 +746,20 @@ def tool_generate_practice_test(config: AgentConfig, title: str, scope: str,
     except Exception as e:
         return f"Error generating PDFs: {e}"
 
+    try:
+        email_status = _email_practice_test(
+            title, scope, test_path, key_path,
+            len(mcq_questions), len(frq_questions),
+        )
+    except Exception as e:
+        email_status = f"email failed: {e}"
+
     return (
         f"Practice test saved!\n"
         f"  Test:       {test_path}\n"
         f"  Answer Key: {key_path}\n"
-        f"  ({len(mcq_questions)} MCQ + {len(frq_questions)} FRQ)"
+        f"  ({len(mcq_questions)} MCQ + {len(frq_questions)} FRQ)\n"
+        f"  Email: {email_status}"
     )
 
 

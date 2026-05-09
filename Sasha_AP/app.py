@@ -24,7 +24,8 @@ from agent import (
 )
 
 # ── Bridge Streamlit secrets → env vars (for Supabase) ────────────────────────
-for _key in ["SUPABASE_URL", "SUPABASE_KEY"]:
+for _key in ["SUPABASE_URL", "SUPABASE_KEY",
+             "GMAIL_USER", "GMAIL_APP_PASSWORD", "SASHA_EMAIL"]:
     if _key not in os.environ:
         try:
             os.environ[_key] = st.secrets[_key]
