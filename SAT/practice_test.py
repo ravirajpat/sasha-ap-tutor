@@ -180,16 +180,35 @@ def generate_module(client, cfg: dict) -> list[dict]:
         messages=[{"role": "user", "content": prompt}],
     )
 
+    def _attr(obj, *keys):
+        """Get attribute or dict key, trying each key in order."""
+        for k in keys:
+            try:
+                return getattr(obj, k)
+            except AttributeError:
+                pass
+            if isinstance(obj, dict):
+                try:
+                    return obj[k]
+                except KeyError:
+                    pass
+        return None
+
     for block in response.content:
-        if block.type == "tool_use" and block.name == "submit_questions":
-            inp = block.input
+        btype = _attr(block, "type")
+        bname = _attr(block, "name")
+        if btype == "tool_use" and bname == "submit_questions":
+            inp = _attr(block, "input") or {}
             if isinstance(inp, str):
                 try:
                     inp = json.loads(inp)
                 except json.JSONDecodeError:
                     inp = {}
-            questions = inp.get("questions", []) if isinstance(inp, dict) else []
-            # Validate and patch choices for MCQ
+            if not isinstance(inp, dict):
+                inp = {}
+            questions = inp.get("questions", [])
+            if not isinstance(questions, list):
+                questions = []
             for q in questions:
                 if isinstance(q, dict) and q.get("type") == "mcq" and not q.get("choices"):
                     q["choices"] = ["A) —", "B) —", "C) —", "D) —"]
@@ -197,8 +216,10 @@ def generate_module(client, cfg: dict) -> list[dict]:
 
     # Fallback: try to extract JSON from text content
     for block in response.content:
-        if block.type == "text":
-            m = re.search(r'\[.*\]', block.text, re.DOTALL)
+        btype = _attr(block, "type")
+        btext = _attr(block, "text") or ""
+        if btype == "text":
+            m = re.search(r'\[.*\]', btext, re.DOTALL)
             if m:
                 try:
                     return json.loads(m.group(0))

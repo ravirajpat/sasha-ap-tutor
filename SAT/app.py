@@ -1012,7 +1012,9 @@ with tab_tests:
             st.session_state.ft_phase      = "instructions"
             st.rerun()
         except Exception as e:
+            import traceback
             st.error(f"Generation failed: {e}")
+            st.code(traceback.format_exc(), language="text")
             if st.button("← Back to Lobby"):
                 st.session_state.ft_phase = "lobby"
                 st.rerun()
