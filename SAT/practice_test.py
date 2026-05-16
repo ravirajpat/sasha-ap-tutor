@@ -174,7 +174,7 @@ def generate_module(client, cfg: dict) -> list[dict]:
 
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=8192,
+        max_tokens=16000,
         tools=[_SUBMIT_QUESTIONS_TOOL],
         tool_choice={"type": "any"},
         messages=[{"role": "user", "content": prompt}],
@@ -182,10 +182,16 @@ def generate_module(client, cfg: dict) -> list[dict]:
 
     for block in response.content:
         if block.type == "tool_use" and block.name == "submit_questions":
-            questions = block.input.get("questions", [])
+            inp = block.input
+            if isinstance(inp, str):
+                try:
+                    inp = json.loads(inp)
+                except json.JSONDecodeError:
+                    inp = {}
+            questions = inp.get("questions", []) if isinstance(inp, dict) else []
             # Validate and patch choices for MCQ
             for q in questions:
-                if q.get("type") == "mcq" and not q.get("choices"):
+                if isinstance(q, dict) and q.get("type") == "mcq" and not q.get("choices"):
                     q["choices"] = ["A) —", "B) —", "C) —", "D) —"]
             return questions
 
