@@ -1480,6 +1480,11 @@ with tab_topic:
             f"<div style='font-size:1.25rem;font-weight:700;margin-top:2px'>{topic['label']}</div>"
             f"<div style='font-size:0.85rem;opacity:0.8;margin-top:4px'>"
             f"{len(questions)} questions · no timer · calculator allowed</div>"
+            f"<div style='margin-top:10px;font-size:0.82rem'>"
+            f"📖 Review while you work: "
+            f"<a href='{topic['ka_url']}' target='_blank' "
+            f"style='color:#7dd3fc;text-decoration:underline'>{topic['ka_label']}</a>"
+            f"</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
