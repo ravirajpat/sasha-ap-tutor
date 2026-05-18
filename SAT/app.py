@@ -28,6 +28,7 @@ from practice_test import (
     MODULE_CONFIGS, generate_full_test, save_test, load_test,
     list_saved_tests, score_test,
 )
+from topic_test import TOPIC_CATALOG, generate_topic_test
 
 # ── Bridge Streamlit secrets → env vars ───────────────────────────────────────
 for _key in ["SUPABASE_URL", "SUPABASE_KEY",
@@ -140,6 +141,19 @@ for _ak in AGENTS:
         st.session_state[f"api_messages_{_ak}"] = []
     if f"chat_history_{_ak}" not in st.session_state:
         st.session_state[f"chat_history_{_ak}"] = []
+
+# Topic-test state
+_TT_DEFAULTS = {
+    "tt_phase":    "lobby",   # lobby | generating | taking | reviewing
+    "tt_subject":  "math",
+    "tt_topic":    None,
+    "tt_num_q":    10,
+    "tt_questions": [],
+    "tt_answers":  {},        # {q_idx: str}
+}
+for _k, _v in _TT_DEFAULTS.items():
+    if _k not in st.session_state:
+        st.session_state[_k] = _v
 
 # Full-test state
 _FT_DEFAULTS = {
@@ -449,8 +463,8 @@ st.markdown(
 )
 
 _sheet_label = "📐 Formula Sheet" if st.session_state.active_agent == "math" else "📋 Strategy Sheet"
-tab_chat, tab_formulas, tab_calc, tab_tests = st.tabs(
-    ["💬 Chat", _sheet_label, "🔢 Calculator", "📝 Full Tests"]
+tab_chat, tab_formulas, tab_calc, tab_tests, tab_topic = st.tabs(
+    ["💬 Chat", _sheet_label, "🔢 Calculator", "📝 Full Tests", "📚 Topic Tests"]
 )
 
 # ── Formula / Strategy Sheet Tab ──────────────────────────────────────────────
@@ -1322,4 +1336,336 @@ with tab_tests:
             st.divider()
             if st.button("← Back to Lobby", use_container_width=True):
                 st.session_state.ft_phase = "lobby"
+                st.rerun()
+
+# ── Topic Tests Tab ────────────────────────────────────────────────────────────
+
+with tab_topic:
+    _tt = st.session_state
+
+    # ── Helper: resolve API key (reuse from full tests) ────────────────────────
+    def _tt_api_key() -> str:
+        try:
+            return st.secrets["ANTHROPIC_API_KEY"]
+        except Exception:
+            return os.environ.get("ANTHROPIC_API_KEY", "")
+
+    # ── Phase: lobby ──────────────────────────────────────────────────────────
+    if _tt.tt_phase == "lobby":
+        st.subheader("📚 Topic Tests")
+        st.caption(
+            "Generate a focused mini-test on any SAT topic. "
+            "Every question comes with a Khan Academy review link so you can go deep on anything you miss."
+        )
+
+        col_subj, col_topic, col_n = st.columns([1, 2, 1])
+
+        with col_subj:
+            subj_choice = st.radio(
+                "Section",
+                options=["math", "reading_writing"],
+                format_func=lambda s: "📐 Math" if s == "math" else "📖 Reading & Writing",
+                index=0 if _tt.tt_subject == "math" else 1,
+                key="tt_subj_radio",
+            )
+            if subj_choice != _tt.tt_subject:
+                _tt.tt_subject = subj_choice
+                _tt.tt_topic   = None
+                st.rerun()
+
+        topics_for_subj = TOPIC_CATALOG[_tt.tt_subject]
+        topic_labels    = [t["label"] for t in topics_for_subj]
+        default_idx     = 0
+        if _tt.tt_topic and _tt.tt_topic.get("label") in topic_labels:
+            default_idx = topic_labels.index(_tt.tt_topic["label"])
+
+        with col_topic:
+            chosen_label = st.selectbox(
+                "Topic",
+                options=topic_labels,
+                index=default_idx,
+                key="tt_topic_select",
+            )
+            chosen_topic = next(t for t in topics_for_subj if t["label"] == chosen_label)
+
+        with col_n:
+            num_q = st.select_slider(
+                "# of Questions",
+                options=[5, 8, 10, 15, 20],
+                value=_tt.tt_num_q,
+                key="tt_num_q_slider",
+            )
+
+        # Show topic info card
+        st.markdown(
+            f"<div style='background:#0e1117;border:1px solid #2a2a3e;border-radius:10px;"
+            f"padding:14px 18px;margin:12px 0'>"
+            f"<div style='font-weight:700;font-size:1rem;margin-bottom:4px'>{chosen_topic['label']}</div>"
+            f"<div style='font-size:0.82em;color:#aaa;margin-bottom:8px'>"
+            f"Domain: {chosen_topic['domain']}</div>"
+            f"<div style='font-size:0.82em;color:#ccc'>{chosen_topic['subtopics']}</div>"
+            f"<div style='margin-top:10px;font-size:0.8em'>"
+            f"📖 Review: <a href='{chosen_topic['ka_url']}' target='_blank' "
+            f"style='color:#0ea5e9'>{chosen_topic['ka_label']}</a></div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        if st.button(
+            f"🚀 Generate {num_q}-Question Test: {chosen_label}",
+            type="primary",
+            use_container_width=True,
+        ):
+            if not _tt_api_key():
+                st.error("ANTHROPIC_API_KEY not set.")
+            else:
+                _tt.tt_subject  = subj_choice
+                _tt.tt_topic    = chosen_topic
+                _tt.tt_num_q    = num_q
+                _tt.tt_questions = []
+                _tt.tt_answers  = {}
+                _tt.tt_phase    = "generating"
+                st.rerun()
+
+    # ── Phase: generating ─────────────────────────────────────────────────────
+    elif _tt.tt_phase == "generating":
+        topic = _tt.tt_topic
+        st.subheader(f"Generating: {topic['label']}")
+
+        status_box  = st.empty()
+        progress_bar = st.progress(0)
+
+        def _tt_status(msg: str):
+            status_box.markdown(msg)
+            progress_bar.progress(0.5)
+
+        try:
+            api_key = _tt_api_key()
+            client  = _get_anthropic_client(api_key)
+            questions = generate_topic_test(
+                client,
+                subject=_tt.tt_subject,
+                topic=topic,
+                num_questions=_tt.tt_num_q,
+                on_status=_tt_status,
+            )
+            progress_bar.progress(1.0)
+            if not questions:
+                st.error("No questions were generated. Please try again.")
+                if st.button("← Back"):
+                    _tt.tt_phase = "lobby"
+                    st.rerun()
+            else:
+                _tt.tt_questions = questions
+                _tt.tt_answers   = {}
+                _tt.tt_phase     = "taking"
+                st.rerun()
+        except Exception as e:
+            import traceback
+            st.error(f"Generation failed: {e}")
+            st.code(traceback.format_exc(), language="text")
+            if st.button("← Back to Topic Lobby"):
+                _tt.tt_phase = "lobby"
+                st.rerun()
+
+    # ── Phase: taking ─────────────────────────────────────────────────────────
+    elif _tt.tt_phase == "taking":
+        topic     = _tt.tt_topic
+        questions = _tt.tt_questions
+
+        st.markdown(
+            f"<div style='background:#1e3a5f;color:#fff;border-radius:10px;"
+            f"padding:16px 20px;margin-bottom:16px'>"
+            f"<div style='font-size:0.75rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.08em'>Topic Test</div>"
+            f"<div style='font-size:1.25rem;font-weight:700;margin-top:2px'>{topic['label']}</div>"
+            f"<div style='font-size:0.85rem;opacity:0.8;margin-top:4px'>"
+            f"{len(questions)} questions · no timer · calculator allowed</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        answered = sum(1 for i in range(len(questions)) if _tt.tt_answers.get(i))
+        st.caption(f"✅ {answered}/{len(questions)} answered")
+        st.divider()
+
+        for q_idx, q in enumerate(questions):
+            q_num    = q.get("number", q_idx + 1)
+            q_type   = q.get("type", "mcq")
+            passage  = q.get("passage", "").strip()
+            question = q.get("question", "")
+            choices  = q.get("choices", [])
+            diff     = q.get("difficulty", "")
+            diff_color = {"easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}.get(diff, "#888")
+
+            st.markdown(
+                f"<div style='display:flex;align-items:baseline;gap:8px;margin-bottom:6px'>"
+                f"<span style='font-weight:700;font-size:1rem'>Q{q_num}.</span>"
+                f"<span style='font-size:0.75em;color:{diff_color};font-weight:600'>{diff.upper()}</span>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+
+            if passage:
+                st.markdown(
+                    f"<div style='background:#f0f4f9;border-left:4px solid #1e3a5f;"
+                    f"padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:10px;"
+                    f"font-size:0.9rem;line-height:1.6;color:#1a1a2e'>{passage}</div>",
+                    unsafe_allow_html=True,
+                )
+
+            st.markdown(
+                f"<div style='font-size:0.95rem;font-weight:600;margin-bottom:10px'>{question}</div>",
+                unsafe_allow_html=True,
+            )
+
+            if q_type == "spr":
+                st.caption("Grid-in — enter a number:")
+                current_val = _tt.tt_answers.get(q_idx, "")
+                new_val = st.text_input(
+                    f"Answer Q{q_num}",
+                    value=current_val,
+                    key=f"tt_spr_{q_idx}",
+                    label_visibility="collapsed",
+                    placeholder="Enter numeric answer…",
+                )
+                if new_val != current_val:
+                    _tt.tt_answers[q_idx] = new_val
+            else:
+                current = _tt.tt_answers.get(q_idx)
+                idx_map = {ch[0]: i for i, ch in enumerate(choices) if ch}
+                cur_idx = idx_map.get(current[0] if current else None)
+
+                selected = st.radio(
+                    f"Answer Q{q_num}",
+                    options=choices,
+                    index=cur_idx,
+                    key=f"tt_mcq_{q_idx}",
+                    label_visibility="collapsed",
+                )
+                if selected:
+                    _tt.tt_answers[q_idx] = selected[0]
+
+            st.divider()
+
+        col_back, col_submit = st.columns([1, 2])
+        with col_back:
+            if st.button("← Back to Lobby", use_container_width=True):
+                _tt.tt_phase = "lobby"
+                st.rerun()
+        with col_submit:
+            answered_final = sum(1 for i in range(len(questions)) if _tt.tt_answers.get(i))
+            unanswered = len(questions) - answered_final
+            warn = f" ({unanswered} unanswered)" if unanswered else ""
+            if st.button(f"✅ Submit & See Results{warn}", type="primary", use_container_width=True):
+                _tt.tt_phase = "reviewing"
+                st.rerun()
+
+    # ── Phase: reviewing ─────────────────────────────────────────────────────
+    elif _tt.tt_phase == "reviewing":
+        topic     = _tt.tt_topic
+        questions = _tt.tt_questions
+        answers   = _tt.tt_answers
+
+        # Score
+        correct_count = 0
+        results = []
+        for q_idx, q in enumerate(questions):
+            given   = answers.get(q_idx, "").strip().upper()
+            correct = q.get("correct_answer", "").strip().upper()
+            if q.get("type") == "spr":
+                try:
+                    is_correct = abs(float(given) - float(correct)) < 0.01
+                except ValueError:
+                    is_correct = given == correct
+            else:
+                is_correct = bool(given) and bool(correct) and given[0] == correct[0]
+            if is_correct:
+                correct_count += 1
+            results.append({**q, "given": answers.get(q_idx, ""), "is_correct": is_correct})
+
+        pct = int(correct_count / len(questions) * 100) if questions else 0
+        score_color = "#22c55e" if pct >= 75 else "#f59e0b" if pct >= 50 else "#ef4444"
+
+        st.markdown(
+            f"<div style='background:linear-gradient(135deg,#1e3a5f,#2563eb);"
+            f"color:#fff;border-radius:14px;padding:24px 28px;text-align:center;margin-bottom:20px'>"
+            f"<div style='font-size:0.8rem;opacity:0.75;text-transform:uppercase;"
+            f"letter-spacing:0.1em;margin-bottom:6px'>Topic Test Results</div>"
+            f"<div style='font-size:1.2rem;font-weight:700;margin-bottom:8px'>{topic['label']}</div>"
+            f"<div style='font-size:3.5rem;font-weight:800;color:{score_color};line-height:1'>"
+            f"{correct_count}/{len(questions)}</div>"
+            f"<div style='font-size:1rem;opacity:0.85;margin-top:4px'>{pct}% correct</div>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        # KA review link banner
+        st.markdown(
+            f"<div style='background:#0e1117;border:1px solid #0ea5e9;border-radius:8px;"
+            f"padding:12px 16px;margin-bottom:16px;font-size:0.88rem'>"
+            f"📖 <strong>Review this topic:</strong> "
+            f"<a href='{topic['ka_url']}' target='_blank' style='color:#0ea5e9'>"
+            f"{topic['ka_label']}</a>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+        st.subheader("Question Review")
+
+        for q_idx, r in enumerate(results):
+            q_num   = r.get("number", q_idx + 1)
+            given   = r.get("given") or "—"
+            correct = r.get("correct_answer", "")
+            icon    = "✅" if r["is_correct"] else "❌"
+            diff    = r.get("difficulty", "")
+
+            with st.expander(
+                f"{icon} Q{q_num} · {diff} · "
+                f"Your answer: **{given}** · Correct: **{correct}**",
+                expanded=not r["is_correct"],
+            ):
+                if r.get("passage"):
+                    st.markdown(
+                        f"<div style='background:#f0f4f9;border-left:3px solid #1e3a5f;"
+                        f"padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:10px;"
+                        f"font-size:0.88rem;color:#374151'>{r['passage']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                st.markdown(f"**{r['question']}**")
+
+                if r.get("choices"):
+                    for ch in r["choices"]:
+                        letter = ch[0] if ch else "?"
+                        if letter == correct[0] if correct else False:
+                            marker = " ✅"
+                        elif given != "—" and letter == (given[0] if given else ""):
+                            marker = " ❌"
+                        else:
+                            marker = ""
+                        arrow = "→ " if (correct and letter == correct[0]) else "   "
+                        st.markdown(f"{arrow}{ch}{marker}")
+
+                st.markdown(f"**Explanation:** {r.get('explanation', '')}")
+
+                # Per-question KA link
+                st.markdown(
+                    f"<div style='margin-top:8px;padding:8px 12px;background:#0e1117;"
+                    f"border-radius:6px;font-size:0.82em'>"
+                    f"📖 <strong>Review concept:</strong> "
+                    f"<a href='{topic['ka_url']}' target='_blank' style='color:#0ea5e9'>"
+                    f"{topic['ka_label']}</a></div>",
+                    unsafe_allow_html=True,
+                )
+
+        st.divider()
+        col_retry, col_new = st.columns(2)
+        with col_retry:
+            if st.button("🔄 Retry Same Topic", use_container_width=True):
+                _tt.tt_questions = []
+                _tt.tt_answers   = {}
+                _tt.tt_phase     = "generating"
+                st.rerun()
+        with col_new:
+            if st.button("← Choose New Topic", use_container_width=True):
+                _tt.tt_phase = "lobby"
                 st.rerun()
