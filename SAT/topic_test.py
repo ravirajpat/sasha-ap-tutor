@@ -203,13 +203,14 @@ _SUBMIT_QUESTIONS_TOOL = {
                         "type":           {"type": "string", "enum": ["mcq", "spr"]},
                         "domain":         {"type": "string"},
                         "difficulty":     {"type": "string", "enum": ["easy", "medium", "hard"]},
+                        "concept":        {"type": "string", "description": "The single specific concept this question tests, as a short 2-5 word phrase (e.g. 'Pythagorean theorem', 'factoring quadratics', 'comma splices', 'subject-verb agreement'). Used to generate a targeted Khan Academy review link."},
                         "passage":        {"type": "string"},
                         "question":       {"type": "string"},
                         "choices":        {"type": "array", "items": {"type": "string"}},
                         "correct_answer": {"type": "string"},
                         "explanation":    {"type": "string"},
                     },
-                    "required": ["number", "type", "domain", "difficulty", "question", "correct_answer", "explanation"],
+                    "required": ["number", "type", "domain", "difficulty", "concept", "question", "correct_answer", "explanation"],
                 },
             }
         },
@@ -236,6 +237,7 @@ CRITICAL requirements:
 • Use clear, self-contained stems. If referencing a figure, describe it in text.
 • passage field is optional — include only for word problems with a real-world scenario.
 • Include a thorough explanation for every question.
+• concept field: a short 2–5 word phrase naming the EXACT concept tested (e.g. "Pythagorean theorem", "slope-intercept form", "factoring quadratics", "circle arc length"). Be specific — this is used to link to the exact Khan Academy lesson.
 
 Number questions 1 through {num_questions}. Call submit_questions with all {num_questions} questions."""
 
@@ -252,10 +254,18 @@ CRITICAL requirements:
 • Choices start with exactly "A) ", "B) ", "C) ", "D) ". correct_answer is a single letter A–D.
 • Every question must be directly on the topic "{topic['label']}". Do NOT mix in unrelated question types.
 • Include a thorough explanation for every question.
+• concept field: a short 2–5 word phrase naming the EXACT concept tested (e.g. "comma splices", "transition words contrast", "subject-verb agreement", "vocabulary in context", "command of evidence textual"). Be specific — this is used to link to the exact Khan Academy lesson.
 
 {_rw_specific_guidance(topic['label'])}
 
 Number questions 1 through {num_questions}. Call submit_questions with all {num_questions} questions."""
+
+
+def concept_ka_url(concept: str) -> str:
+    """Build a Khan Academy SAT search URL for a specific concept."""
+    import urllib.parse
+    query = urllib.parse.quote_plus(f"SAT {concept}")
+    return f"https://www.khanacademy.org/search?page_search_query={query}"
 
 
 def _rw_specific_guidance(label: str) -> str:

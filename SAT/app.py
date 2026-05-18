@@ -1652,13 +1652,21 @@ with tab_topic:
 
                 st.markdown(f"**Explanation:** {r.get('explanation', '')}")
 
-                # Per-question KA link
+                # Per-question KA link — specific to the concept this question tests
+                from topic_test import concept_ka_url
+                concept = r.get("concept", "").strip()
+                if concept:
+                    q_ka_url   = concept_ka_url(concept)
+                    q_ka_label = concept
+                else:
+                    q_ka_url   = topic["ka_url"]
+                    q_ka_label = topic["ka_label"]
                 st.markdown(
                     f"<div style='margin-top:8px;padding:8px 12px;background:#0e1117;"
                     f"border-radius:6px;font-size:0.82em'>"
-                    f"📖 <strong>Review concept:</strong> "
-                    f"<a href='{topic['ka_url']}' target='_blank' style='color:#0ea5e9'>"
-                    f"{topic['ka_label']}</a></div>",
+                    f"📖 <strong>Review on Khan Academy:</strong> "
+                    f"<a href='{q_ka_url}' target='_blank' style='color:#0ea5e9'>"
+                    f"{q_ka_label}</a></div>",
                     unsafe_allow_html=True,
                 )
 
