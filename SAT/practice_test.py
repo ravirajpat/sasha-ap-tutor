@@ -5,6 +5,7 @@ Generates realistic 4-module tests (R&W ×2 + Math ×2) using Claude.
 """
 
 import json
+import math
 import os
 import re
 from datetime import datetime
@@ -116,88 +117,80 @@ _SUBMIT_QUESTIONS_TOOL = {
 
 # ── Generation prompts ────────────────────────────────────────────────────────
 
-def _rw_prompt(cfg: dict) -> str:
+_BATCH_SIZE = 10  # questions per API call — keeps output well within token limits
+
+def _rw_prompt(cfg: dict, start_num: int, count: int) -> str:
+    end_num = start_num + count - 1
     dist = "\n".join(f"  • {d}: {n} questions" for d, n in cfg["domain_counts"].items())
-    return f"""Generate {cfg['num_questions']} SAT Reading & Writing questions for Module {cfg['module_num']}.
+    return f"""Generate {count} SAT Reading & Writing questions for Module {cfg['module_num']}.
 Difficulty: {cfg['difficulty_note']}.
 
-Domain distribution:
+Domain guidance (distribute evenly across this batch):
 {dist}
 
 CRITICAL requirements — follow exactly:
-• Every question MUST include a "passage" field: a realistic 1-4 sentence excerpt (50-120 words) from an academic, literary, or informational text. The Digital SAT always pairs each R&W question with a passage.
-• All questions are multiple choice (type: "mcq") with exactly 4 choices: A), B), C), D).
+• Every question MUST include a "passage" field: a realistic 1-4 sentence excerpt (50-120 words) from an academic, literary, or informational text.
+• All questions are multiple choice (type: "mcq") with exactly 4 choices.
 • Choices must start with exactly "A) ", "B) ", "C) ", "D) " (letter, close-paren, space).
 • correct_answer is a single letter: A, B, C, or D.
 
 Domain guidance:
-• Information & Ideas — main idea, specific detail, inference, command of evidence (quote that supports a claim), or data interpretation.
-• Craft & Structure — words-in-context ("As used in the passage, X most nearly means..."), text structure/purpose, or cross-text connections (give two short passages and ask how author B would respond to author A).
-• Expression of Ideas — rhetorical synthesis ("Which sentence most effectively introduces...") or transitions ("Which choice most logically connects these sentences?").
-• Standard English Conventions — the passage contains a blank [______] or underlined segment; the question asks which choice correctly completes or revises it. Test subject-verb agreement, pronoun agreement, comma use, semicolons, colons, verb tense, or sentence boundaries.
+• Information & Ideas — main idea, specific detail, inference, command of evidence, data interpretation.
+• Craft & Structure — words-in-context, text structure/purpose, or cross-text connections.
+• Expression of Ideas — rhetorical synthesis or transitions.
+• Standard English Conventions — passage with a blank [______]; test grammar/punctuation rules.
 
-Number questions 1 through {cfg['num_questions']}. Call submit_questions with all {cfg['num_questions']} questions."""
+Number questions {start_num} through {end_num}. Call submit_questions with all {count} questions."""
 
 
-def _math_prompt(cfg: dict) -> str:
-    n_mcq = cfg["num_questions"] - cfg["num_spr"]
-    dist  = "\n".join(f"  • {d}: {n} questions" for d, n in cfg["domain_counts"].items())
-    return f"""Generate {cfg['num_questions']} SAT Math questions for Module {cfg['module_num']}.
+def _math_prompt(cfg: dict, start_num: int, count: int) -> str:
+    end_num  = start_num + count - 1
+    # Scale SPR count proportionally for this batch
+    spr_batch = max(0, round(cfg["num_spr"] * count / cfg["num_questions"]))
+    mcq_batch = count - spr_batch
+    dist = "\n".join(f"  • {d}: {n} questions" for d, n in cfg["domain_counts"].items())
+    return f"""Generate {count} SAT Math questions for Module {cfg['module_num']}.
 Difficulty: {cfg['difficulty_note']}.
-Total: {n_mcq} multiple choice (MCQ) + {cfg['num_spr']} student-produced response (SPR/grid-in).
+Format for this batch: {mcq_batch} multiple choice (MCQ) + {spr_batch} student-produced response (SPR/grid-in).
 
-Domain distribution (spread MCQ and SPR across domains):
+Domain distribution (distribute evenly across this batch):
 {dist}
 
 CRITICAL requirements — follow exactly:
-• MCQ questions (type: "mcq"): 4 choices starting with "A) ", "B) ", "C) ", "D) ". correct_answer is A, B, C, or D.
-• SPR questions (type: "spr"): NO choices field. correct_answer is a numeric string (integer or decimal, e.g. "7", "3.5", "12/5"). The question must have a single, unambiguous numeric answer.
-• Calculator is available for all questions.
-• Use clear, self-contained question stems. If a question references a figure, describe it in text (e.g., "In the figure, triangle ABC has sides...").
-• Do NOT reference images, graphs, or tables you can't describe in text.
-• passage field is optional — include only for word problems with a real-world scenario.
+• MCQ (type: "mcq"): 4 choices starting with "A) ", "B) ", "C) ", "D) ". correct_answer is A, B, C, or D.
+• SPR (type: "spr"): NO choices field. correct_answer is a numeric string (e.g. "7", "3.5"). Single unambiguous numeric answer.
+• Calculator is available. Self-contained stems — describe any figure in text.
+• passage field is optional — only for real-world word problems.
 
 Domain guidance:
 • Algebra — linear equations/inequalities, slope, systems of equations, linear functions.
-• Advanced Math — quadratics (factoring, quadratic formula, vertex form), polynomials, exponential functions, rational equations, function notation.
-• Problem Solving & Data Analysis — percent, ratio, rates, unit conversion, statistics (mean/median/mode), probability, scatter plots described in text.
-• Geometry & Trigonometry — area, volume, Pythagorean theorem, similar triangles, circle properties, right-triangle trig (sin/cos/tan), arc length.
+• Advanced Math — quadratics, polynomials, exponential functions, rational equations, function notation.
+• Problem Solving & Data Analysis — percent, ratio, rates, unit conversion, statistics, probability.
+• Geometry & Trigonometry — area, volume, Pythagorean theorem, similar triangles, circles, trig.
 
-Number questions 1 through {cfg['num_questions']}. Call submit_questions with all {cfg['num_questions']} questions."""
+Number questions {start_num} through {end_num}. Call submit_questions with all {count} questions."""
 
 
 # ── Module generation ─────────────────────────────────────────────────────────
 
-def generate_module(client, cfg: dict) -> list[dict]:
-    """Call Claude once to generate all questions for one module. Returns question list."""
-    prompt = _rw_prompt(cfg) if cfg["section"] == "reading_writing" else _math_prompt(cfg)
-
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=16000,
-        tools=[_SUBMIT_QUESTIONS_TOOL],
-        tool_choice={"type": "any"},
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    def _attr(obj, *keys):
-        """Get attribute or dict key, trying each key in order."""
-        for k in keys:
+def _attr(obj, *keys):
+    for k in keys:
+        try:
+            return getattr(obj, k)
+        except AttributeError:
+            pass
+        if isinstance(obj, dict):
             try:
-                return getattr(obj, k)
-            except AttributeError:
+                return obj[k]
+            except KeyError:
                 pass
-            if isinstance(obj, dict):
-                try:
-                    return obj[k]
-                except KeyError:
-                    pass
-        return None
+    return None
 
+
+def _parse_questions(response) -> list[dict]:
+    """Extract the questions list from a Claude API response."""
     for block in response.content:
-        btype = _attr(block, "type")
-        bname = _attr(block, "name")
-        if btype == "tool_use" and bname == "submit_questions":
+        if _attr(block, "type") == "tool_use" and _attr(block, "name") == "submit_questions":
             inp = _attr(block, "input") or {}
             if isinstance(inp, str):
                 try:
@@ -214,12 +207,11 @@ def generate_module(client, cfg: dict) -> list[dict]:
                     q["choices"] = ["A) —", "B) —", "C) —", "D) —"]
             return questions
 
-    # Fallback: try to extract JSON from text content
+    # Fallback: scan text blocks for a JSON array
     for block in response.content:
-        btype = _attr(block, "type")
-        btext = _attr(block, "text") or ""
-        if btype == "text":
-            m = re.search(r'\[.*\]', btext, re.DOTALL)
+        if _attr(block, "type") == "text":
+            text = _attr(block, "text") or ""
+            m = re.search(r'\[.*\]', text, re.DOTALL)
             if m:
                 try:
                     return json.loads(m.group(0))
@@ -228,25 +220,84 @@ def generate_module(client, cfg: dict) -> list[dict]:
     return []
 
 
+def _generate_batch(client, cfg: dict, start_num: int, count: int) -> list[dict]:
+    """Generate one batch of `count` questions with up to 3 retry attempts."""
+    is_rw = cfg["section"] == "reading_writing"
+
+    for attempt in range(3):
+        prompt = (
+            _rw_prompt(cfg, start_num, count)
+            if is_rw
+            else _math_prompt(cfg, start_num, count)
+        )
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=16000,
+            tools=[_SUBMIT_QUESTIONS_TOOL],
+            tool_choice={"type": "tool", "name": "submit_questions"},
+            messages=[{"role": "user", "content": prompt}],
+        )
+
+        if response.stop_reason == "max_tokens":
+            # Output was truncated — retry (last attempt will propagate empty)
+            continue
+
+        questions = _parse_questions(response)
+        if questions:
+            return questions
+
+    return []
+
+
+def generate_module(client, cfg: dict) -> list[dict]:
+    """Generate all questions for one module in batches of _BATCH_SIZE."""
+    total      = cfg["num_questions"]
+    all_q: list[dict] = []
+    start      = 1
+
+    while start <= total:
+        count = min(_BATCH_SIZE, total - start + 1)
+        batch = _generate_batch(client, cfg, start_num=start, count=count)
+        all_q.extend(batch)
+        start += count
+
+    return all_q
+
+
 def generate_full_test(client, on_status: Optional[Callable[[str], None]] = None) -> dict:
     """Generate all 4 modules. on_status(msg) is called with progress updates."""
     test_id = datetime.now().strftime("test_%Y%m%d_%H%M%S")
     modules = []
 
     for cfg in MODULE_CONFIGS:
-        if on_status:
-            on_status(f"Generating {cfg['display']} ({cfg['num_questions']} questions)…")
-        questions = generate_module(client, cfg)
+        total  = cfg["num_questions"]
+        all_q: list[dict] = []
+        start  = 1
+        batch_num = 0
+
+        while start <= total:
+            count     = min(_BATCH_SIZE, total - start + 1)
+            batch_num += 1
+            n_batches  = math.ceil(total / _BATCH_SIZE)
+            if on_status:
+                on_status(
+                    f"Generating {cfg['display']} — "
+                    f"batch {batch_num}/{n_batches} (Q{start}–{start+count-1})…"
+                )
+            batch = _generate_batch(client, cfg, start_num=start, count=count)
+            all_q.extend(batch)
+            if on_status:
+                on_status(f"✅ Batch {batch_num}/{n_batches} of {cfg['display']} — {len(batch)} questions")
+            start += count
+
         modules.append({
             "key":          cfg["key"],
             "display":      cfg["display"],
             "section":      cfg["section"],
             "module_num":   cfg["module_num"],
             "time_minutes": cfg["time_minutes"],
-            "questions":    questions,
+            "questions":    all_q,
         })
-        if on_status:
-            on_status(f"✅ {cfg['display']} — {len(questions)} questions generated")
 
     return {
         "id":         test_id,

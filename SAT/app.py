@@ -998,7 +998,7 @@ with tab_tests:
     # ── Phase: generating ─────────────────────────────────────────────────────
     elif st.session_state.ft_phase == "generating":
         st.subheader("Generating your full-length SAT practice test…")
-        st.caption("Claude is writing 98 questions across 4 modules. This takes about 3–5 minutes.")
+        st.caption("Claude is writing 98 questions across 4 modules in small batches. This takes about 3–5 minutes.")
 
         api_key = _resolve_api_key()
         client  = _get_anthropic_client(api_key)
@@ -1006,13 +1006,17 @@ with tab_tests:
         log_container = st.empty()
         progress_bar  = st.progress(0)
 
+        # Total batches across all 4 modules (ceil(27/10)*2 + ceil(22/10)*2 = 3*2 + 3*2 = 12)
+        _TOTAL_BATCHES = sum(
+            math.ceil(mc["num_questions"] / 10) for mc in MODULE_CONFIGS
+        )
         gen_log: list[str] = []
 
         def on_status(msg: str):
             gen_log.append(msg)
             log_container.markdown("\n\n".join(gen_log))
             done = sum(1 for m in gen_log if m.startswith("✅"))
-            progress_bar.progress(done / len(MODULE_CONFIGS))
+            progress_bar.progress(min(done / _TOTAL_BATCHES, 1.0))
 
         try:
             test_data = generate_full_test(client, on_status=on_status)
