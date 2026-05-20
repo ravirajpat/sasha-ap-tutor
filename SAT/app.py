@@ -23,6 +23,7 @@ from agent import (
     LEVEL_NAMES, LEVEL_ICONS, MODEL,
     load_performance, load_weak_topics, days_remaining,
     get_today_questions, get_daily_topic, MIN_QUESTIONS,
+    load_topic_history, save_topic_result, analyze_topic_performance, predict_sat_score,
 )
 from practice_test import (
     MODULE_CONFIGS, generate_full_test, save_test, load_test,
@@ -144,12 +145,14 @@ for _ak in AGENTS:
 
 # Topic-test state
 _TT_DEFAULTS = {
-    "tt_phase":    "lobby",   # lobby | generating | taking | reviewing
-    "tt_subject":  "math",
-    "tt_topic":    None,
-    "tt_num_q":    10,
-    "tt_questions": [],
-    "tt_answers":  {},        # {q_idx: str}
+    "tt_phase":        "lobby",   # lobby | generating | taking | reviewing
+    "tt_subject":      "math",
+    "tt_topic":        None,
+    "tt_num_q":        10,
+    "tt_difficulty":   "mixed",   # mixed | easy | medium | hard
+    "tt_questions":    [],
+    "tt_answers":      {},        # {q_idx: str}
+    "tt_result_saved": False,     # guards double-save on rerun
 }
 for _k, _v in _TT_DEFAULTS.items():
     if _k not in st.session_state:
@@ -1362,7 +1365,7 @@ with tab_topic:
             "Every question comes with a Khan Academy review link so you can go deep on anything you miss."
         )
 
-        col_subj, col_topic, col_n = st.columns([1, 2, 1])
+        col_subj, col_topic, col_diff, col_n = st.columns([1, 2, 1, 1])
 
         with col_subj:
             subj_choice = st.radio(
@@ -1392,6 +1395,17 @@ with tab_topic:
             )
             chosen_topic = next(t for t in topics_for_subj if t["label"] == chosen_label)
 
+        _DIFF_OPTIONS = ["mixed", "easy", "medium", "hard"]
+        _DIFF_LABELS  = {"mixed": "Mixed", "easy": "Easy", "medium": "Medium", "hard": "Hard"}
+        with col_diff:
+            diff_choice = st.selectbox(
+                "Difficulty",
+                options=_DIFF_OPTIONS,
+                index=_DIFF_OPTIONS.index(_tt.tt_difficulty),
+                format_func=lambda d: _DIFF_LABELS[d],
+                key="tt_diff_select",
+            )
+
         with col_n:
             num_q = st.select_slider(
                 "# of Questions",
@@ -1401,10 +1415,17 @@ with tab_topic:
             )
 
         # Show topic info card
+        _diff_badge_color = {"mixed": "#6366f1", "easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}
         st.markdown(
             f"<div style='background:#0e1117;border:1px solid #2a2a3e;border-radius:10px;"
             f"padding:14px 18px;margin:12px 0'>"
-            f"<div style='font-weight:700;font-size:1rem;margin-bottom:4px'>{chosen_topic['label']}</div>"
+            f"<div style='display:flex;align-items:center;gap:10px;margin-bottom:4px'>"
+            f"<span style='font-weight:700;font-size:1rem'>{chosen_topic['label']}</span>"
+            f"<span style='font-size:0.72em;font-weight:600;padding:2px 8px;border-radius:20px;"
+            f"background:{_diff_badge_color.get(diff_choice,'#6366f1')}22;"
+            f"color:{_diff_badge_color.get(diff_choice,'#6366f1')};border:1px solid {_diff_badge_color.get(diff_choice,'#6366f1')}44'>"
+            f"{_DIFF_LABELS[diff_choice]}</span>"
+            f"</div>"
             f"<div style='font-size:0.82em;color:#aaa;margin-bottom:8px'>"
             f"Domain: {chosen_topic['domain']}</div>"
             f"<div style='font-size:0.82em;color:#ccc'>{chosen_topic['subtopics']}</div>"
@@ -1416,20 +1437,112 @@ with tab_topic:
         )
 
         if st.button(
-            f"🚀 Generate {num_q}-Question Test: {chosen_label}",
+            f"🚀 Generate {num_q}-Question Test: {chosen_label} ({_DIFF_LABELS[diff_choice]})",
             type="primary",
             use_container_width=True,
         ):
             if not _tt_api_key():
                 st.error("ANTHROPIC_API_KEY not set.")
             else:
-                _tt.tt_subject  = subj_choice
-                _tt.tt_topic    = chosen_topic
-                _tt.tt_num_q    = num_q
-                _tt.tt_questions = []
-                _tt.tt_answers  = {}
-                _tt.tt_phase    = "generating"
+                _tt.tt_subject      = subj_choice
+                _tt.tt_topic        = chosen_topic
+                _tt.tt_num_q        = num_q
+                _tt.tt_difficulty   = diff_choice
+                _tt.tt_questions    = []
+                _tt.tt_answers      = {}
+                _tt.tt_result_saved = False
+                _tt.tt_phase        = "generating"
                 st.rerun()
+
+        # ── Performance Dashboard ──────────────────────────────────────────────
+        st.divider()
+        st.subheader("Performance Dashboard")
+
+        math_hist = load_topic_history("math")
+        rw_hist   = load_topic_history("reading_writing")
+        all_hist  = math_hist + rw_hist
+
+        if not all_hist:
+            st.info("No topic tests completed yet. Generate your first test above!")
+        else:
+            # Score prediction
+            pred = predict_sat_score(math_hist, rw_hist)
+            if pred:
+                p_cols = st.columns(len(pred))
+                labels = {"math_scaled": "Math", "rw_scaled": "Reading & Writing", "total": "Predicted Total"}
+                colors = {"math_scaled": "#3b82f6", "rw_scaled": "#8b5cf6", "total": "#10b981"}
+                for col, (key, val) in zip(p_cols, pred.items()):
+                    with col:
+                        st.markdown(
+                            f"<div style='background:#0e1117;border:1px solid {colors[key]};"
+                            f"border-radius:10px;padding:14px;text-align:center'>"
+                            f"<div style='font-size:0.75rem;color:#aaa;text-transform:uppercase;"
+                            f"letter-spacing:0.07em'>{labels[key]}</div>"
+                            f"<div style='font-size:2.2rem;font-weight:800;color:{colors[key]}'>{val}</div>"
+                            f"<div style='font-size:0.72rem;color:#666'>estimated</div>"
+                            f"</div>",
+                            unsafe_allow_html=True,
+                        )
+                st.caption("Score estimate based on weighted domain performance across topic tests.")
+                st.markdown("")
+
+            # Weak topics
+            math_analysis = analyze_topic_performance("math")
+            rw_analysis   = analyze_topic_performance("reading_writing")
+            weak_math = math_analysis["weak_topics"]
+            weak_rw   = rw_analysis["weak_topics"]
+
+            if weak_math or weak_rw:
+                st.markdown("**Areas needing attention** (below 70%)")
+                w_cols = st.columns(2)
+                with w_cols[0]:
+                    st.caption("Math")
+                    if weak_math:
+                        for t in weak_math:
+                            s = math_analysis["topic_stats"][t]
+                            pct_color = "#ef4444" if s["pct"] < 50 else "#f59e0b"
+                            st.markdown(
+                                f"<span style='color:{pct_color};font-weight:600'>{s['pct']}%</span>"
+                                f" &nbsp; {t}",
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.caption("None — great work!")
+                with w_cols[1]:
+                    st.caption("Reading & Writing")
+                    if weak_rw:
+                        for t in weak_rw:
+                            s = rw_analysis["topic_stats"][t]
+                            pct_color = "#ef4444" if s["pct"] < 50 else "#f59e0b"
+                            st.markdown(
+                                f"<span style='color:{pct_color};font-weight:600'>{s['pct']}%</span>"
+                                f" &nbsp; {t}",
+                                unsafe_allow_html=True,
+                            )
+                    else:
+                        st.caption("None — great work!")
+                st.markdown("")
+
+            # Topic history table
+            with st.expander("All topic test results", expanded=False):
+                for subj_label, hist, analysis in [
+                    ("Math", math_hist, math_analysis),
+                    ("Reading & Writing", rw_hist, rw_analysis),
+                ]:
+                    if not hist:
+                        continue
+                    st.markdown(f"**{subj_label}**")
+                    rows = []
+                    for r in reversed(hist):
+                        taken = r["taken_at"][:10]
+                        pct   = r["pct"]
+                        flag  = " ⚠️" if pct < 70 else (" ✅" if pct >= 85 else "")
+                        rows.append(f"| {taken} | {r['topic']} | {r['domain']} | {r['correct']}/{r['total']} | {pct}%{flag} |")
+                    st.markdown(
+                        "| Date | Topic | Domain | Score | % |\n"
+                        "|------|-------|--------|-------|---|\n" +
+                        "\n".join(rows)
+                    )
 
     # ── Phase: generating ─────────────────────────────────────────────────────
     elif _tt.tt_phase == "generating":
@@ -1451,6 +1564,7 @@ with tab_topic:
                 subject=_tt.tt_subject,
                 topic=topic,
                 num_questions=_tt.tt_num_q,
+                difficulty=_tt.tt_difficulty,
                 on_status=_tt_status,
             )
             progress_bar.progress(1.0)
@@ -1477,11 +1591,19 @@ with tab_topic:
         topic     = _tt.tt_topic
         questions = _tt.tt_questions
 
+        _tt_diff      = _tt.get("tt_difficulty", "mixed")
+        _diff_colors  = {"mixed": "#6366f1", "easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}
+        _diff_dc      = _diff_colors.get(_tt_diff, "#6366f1")
         st.markdown(
             f"<div style='background:#1e3a5f;color:#fff;border-radius:10px;"
             f"padding:16px 20px;margin-bottom:16px'>"
             f"<div style='font-size:0.75rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.08em'>Topic Test</div>"
-            f"<div style='font-size:1.25rem;font-weight:700;margin-top:2px'>{topic['label']}</div>"
+            f"<div style='display:flex;align-items:center;gap:10px;margin-top:2px'>"
+            f"<span style='font-size:1.25rem;font-weight:700'>{topic['label']}</span>"
+            f"<span style='font-size:0.72em;font-weight:600;padding:2px 8px;border-radius:20px;"
+            f"background:{_diff_dc}33;color:{_diff_dc};border:1px solid {_diff_dc}55'>"
+            f"{_tt_diff.capitalize()}</span>"
+            f"</div>"
             f"<div style='font-size:0.85rem;opacity:0.8;margin-top:4px'>"
             f"{len(questions)} questions · no timer · calculator allowed</div>"
             f"<div style='margin-top:10px;font-size:0.82rem'>"
@@ -1595,12 +1717,30 @@ with tab_topic:
         pct = int(correct_count / len(questions) * 100) if questions else 0
         score_color = "#22c55e" if pct >= 75 else "#f59e0b" if pct >= 50 else "#ef4444"
 
+        # Persist result once per test
+        if not _tt.get("tt_result_saved", False) and questions:
+            save_topic_result(
+                _tt.tt_subject,
+                topic["label"],
+                topic.get("domain", ""),
+                correct_count,
+                len(questions),
+            )
+            _tt.tt_result_saved = True
+
+        _rev_diff     = _tt.get("tt_difficulty", "mixed")
+        _rev_dc       = {"mixed": "#6366f1", "easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}.get(_rev_diff, "#6366f1")
         st.markdown(
             f"<div style='background:linear-gradient(135deg,#1e3a5f,#2563eb);"
             f"color:#fff;border-radius:14px;padding:24px 28px;text-align:center;margin-bottom:20px'>"
             f"<div style='font-size:0.8rem;opacity:0.75;text-transform:uppercase;"
             f"letter-spacing:0.1em;margin-bottom:6px'>Topic Test Results</div>"
-            f"<div style='font-size:1.2rem;font-weight:700;margin-bottom:8px'>{topic['label']}</div>"
+            f"<div style='display:inline-flex;align-items:center;gap:10px;margin-bottom:8px'>"
+            f"<span style='font-size:1.2rem;font-weight:700'>{topic['label']}</span>"
+            f"<span style='font-size:0.7em;font-weight:600;padding:2px 8px;border-radius:20px;"
+            f"background:{_rev_dc}44;color:{_rev_dc};border:1px solid {_rev_dc}66'>"
+            f"{_rev_diff.capitalize()}</span>"
+            f"</div>"
             f"<div style='font-size:3.5rem;font-weight:800;color:{score_color};line-height:1'>"
             f"{correct_count}/{len(questions)}</div>"
             f"<div style='font-size:1rem;opacity:0.85;margin-top:4px'>{pct}% correct</div>"
@@ -1678,9 +1818,10 @@ with tab_topic:
         col_retry, col_new = st.columns(2)
         with col_retry:
             if st.button("🔄 Retry Same Topic", use_container_width=True):
-                _tt.tt_questions = []
-                _tt.tt_answers   = {}
-                _tt.tt_phase     = "generating"
+                _tt.tt_questions    = []
+                _tt.tt_answers      = {}
+                _tt.tt_result_saved = False
+                _tt.tt_phase        = "generating"
                 st.rerun()
         with col_new:
             if st.button("← Choose New Topic", use_container_width=True):

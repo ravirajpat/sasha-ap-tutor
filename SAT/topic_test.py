@@ -219,7 +219,16 @@ _SUBMIT_QUESTIONS_TOOL = {
 }
 
 
-def _build_prompt(subject: str, topic: dict, num_questions: int) -> str:
+_DIFFICULTY_LINE = {
+    "mixed": "Difficulty: mixed — include a spread of easy, medium, and hard questions.",
+    "easy":  "Difficulty: easy — all questions should test basic understanding and be straightforward.",
+    "medium": "Difficulty: medium — all questions should require solid understanding and application.",
+    "hard":  "Difficulty: hard — all questions should be challenging and require deep analysis or multi-step reasoning.",
+}
+
+
+def _build_prompt(subject: str, topic: dict, num_questions: int, difficulty: str = "mixed") -> str:
+    diff_line = _DIFFICULTY_LINE.get(difficulty, _DIFFICULTY_LINE["mixed"])
     if subject == "math":
         spr_count = max(1, num_questions // 5) if num_questions >= 5 else 0
         mcq_count = num_questions - spr_count
@@ -227,7 +236,7 @@ def _build_prompt(subject: str, topic: dict, num_questions: int) -> str:
 
 Subtopics to cover: {topic['subtopics']}
 Domain: {topic['domain']}
-Difficulty: mixed (easy, medium, and hard — spread them out)
+{diff_line}
 Format: {mcq_count} multiple choice (MCQ) + {spr_count} student-produced response (SPR/grid-in)
 
 CRITICAL requirements:
@@ -246,7 +255,7 @@ Number questions 1 through {num_questions}. Call submit_questions with all {num_
 
 Subtopics to cover: {topic['subtopics']}
 Domain: {topic['domain']}
-Difficulty: mixed (easy, medium, and hard — spread them out)
+{diff_line}
 All questions: multiple choice (type: "mcq") with exactly 4 choices.
 
 CRITICAL requirements:
@@ -291,13 +300,14 @@ def generate_topic_test(
     subject: str,
     topic: dict,
     num_questions: int,
+    difficulty: str = "mixed",
     on_status: callable = None,
 ) -> list[dict]:
     """Generate questions for one topic. Returns list of question dicts."""
     if on_status:
         on_status(f"Generating {num_questions} questions on **{topic['label']}**…")
 
-    prompt = _build_prompt(subject, topic, num_questions)
+    prompt = _build_prompt(subject, topic, num_questions, difficulty)
 
     response = client.messages.create(
         model="claude-sonnet-4-6",

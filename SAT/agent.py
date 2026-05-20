@@ -433,6 +433,113 @@ def save_weak_topics(config: AgentConfig, topics: list) -> None:
         json.dump(topics, f, indent=2)
 
 
+# ── Topic test history ────────────────────────────────────────────────────────
+
+def load_topic_history(subject: str) -> list:
+    path = f"{subject}_topic_history.json"
+    if not os.path.exists(path):
+        return []
+    with open(path) as f:
+        return json.load(f)
+
+
+def save_topic_result(subject: str, topic_label: str, domain: str, correct: int, total: int) -> None:
+    history = load_topic_history(subject)
+    history.append({
+        "topic": topic_label,
+        "domain": domain,
+        "correct": correct,
+        "total": total,
+        "pct": round(correct / total * 100) if total else 0,
+        "taken_at": datetime.now().isoformat(),
+    })
+    path = f"{subject}_topic_history.json"
+    with open(path, "w") as f:
+        json.dump(history, f, indent=2)
+
+
+def analyze_topic_performance(subject: str) -> dict:
+    """Aggregate topic history into per-topic and per-domain stats."""
+    history = load_topic_history(subject)
+    topic_stats: dict = {}
+    domain_stats: dict = {}
+
+    for r in history:
+        t, d = r["topic"], r["domain"]
+        if t not in topic_stats:
+            topic_stats[t] = {"domain": d, "correct": 0, "total": 0, "attempts": 0}
+        topic_stats[t]["correct"] += r["correct"]
+        topic_stats[t]["total"]   += r["total"]
+        topic_stats[t]["attempts"] += 1
+
+        if d not in domain_stats:
+            domain_stats[d] = {"correct": 0, "total": 0}
+        domain_stats[d]["correct"] += r["correct"]
+        domain_stats[d]["total"]   += r["total"]
+
+    for s in topic_stats.values():
+        s["pct"] = round(s["correct"] / s["total"] * 100) if s["total"] else 0
+    for s in domain_stats.values():
+        s["pct"] = round(s["correct"] / s["total"] * 100) if s["total"] else 0
+
+    weak_topics = sorted(
+        [t for t, s in topic_stats.items() if s["pct"] < 70],
+        key=lambda t: topic_stats[t]["pct"],
+    )
+    return {"topic_stats": topic_stats, "domain_stats": domain_stats, "weak_topics": weak_topics}
+
+
+_MATH_WEIGHTS = {
+    "Algebra": 0.35,
+    "Advanced Math": 0.35,
+    "Problem Solving & Data Analysis": 0.15,
+    "Geometry & Trigonometry": 0.15,
+}
+_RW_WEIGHTS = {
+    "Information & Ideas": 0.26,
+    "Craft & Structure": 0.28,
+    "Expression of Ideas": 0.20,
+    "Standard English Conventions": 0.26,
+}
+
+
+def predict_sat_score(math_history: list, rw_history: list) -> dict:
+    """Estimate SAT score from topic test history using domain-weighted performance."""
+    def _section(history: list, weights: dict) -> int | None:
+        domain_stats: dict = {}
+        for r in history:
+            d = r["domain"]
+            if d not in domain_stats:
+                domain_stats[d] = {"correct": 0, "total": 0}
+            domain_stats[d]["correct"] += r["correct"]
+            domain_stats[d]["total"]   += r["total"]
+
+        covered = {d: s for d, s in domain_stats.items() if d in weights}
+        if not covered:
+            return None
+
+        total_w = sum(weights[d] for d in covered)
+        weighted_pct = sum(
+            (s["correct"] / s["total"]) * weights[d]
+            for d, s in covered.items()
+            if s["total"]
+        ) / total_w
+
+        # Map 0–1 performance → 200–800 scaled score
+        return max(200, min(800, round(200 + weighted_pct * 600)))
+
+    math_scaled = _section(math_history, _MATH_WEIGHTS)
+    rw_scaled   = _section(rw_history,   _RW_WEIGHTS)
+    result: dict = {}
+    if math_scaled is not None:
+        result["math_scaled"] = math_scaled
+    if rw_scaled is not None:
+        result["rw_scaled"] = rw_scaled
+    if math_scaled is not None and rw_scaled is not None:
+        result["total"] = math_scaled + rw_scaled
+    return result
+
+
 def _local_get_today(config: AgentConfig) -> int:
     if not os.path.exists(config.daily_progress_file):
         return 0
