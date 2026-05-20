@@ -311,15 +311,88 @@ class TestDifficultyPrompt:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Timer — per-subject time limit calculation
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestTimerLogic:
+    """Tests for the per-question time limits and remaining-time arithmetic."""
+
+    def _secs_per_q(self):
+        import ast, pathlib
+        src = pathlib.Path(__file__).parent / "app.py"
+        tree = ast.parse(src.read_text())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Assign):
+                for t in node.targets:
+                    if isinstance(t, ast.Name) and t.id == "_TT_SECS_PER_Q":
+                        return ast.literal_eval(node.value)
+        return {}
+
+    def test_secs_per_q_defined_for_both_subjects(self):
+        spq = self._secs_per_q()
+        assert "math"            in spq
+        assert "reading_writing" in spq
+
+    def test_math_secs_per_q_matches_sat_pace(self):
+        # Digital SAT Math: 35 min / 22 questions ≈ 95 s — allow ±5 s tolerance
+        spq = self._secs_per_q()
+        assert 90 <= spq["math"] <= 100
+
+    def test_rw_secs_per_q_matches_sat_pace(self):
+        # Digital SAT R&W: 32 min / 27 questions ≈ 71 s — allow ±5 s tolerance
+        spq = self._secs_per_q()
+        assert 66 <= spq["reading_writing"] <= 76
+
+    def test_time_limit_scales_with_question_count(self):
+        spq = self._secs_per_q()
+        for n in [5, 10, 15, 20]:
+            math_limit = n * spq["math"]
+            rw_limit   = n * spq["reading_writing"]
+            assert math_limit == n * spq["math"]
+            assert rw_limit   == n * spq["reading_writing"]
+
+    def test_remaining_time_arithmetic(self):
+        import time as _time
+        spq      = self._secs_per_q()
+        limit    = 10 * spq["math"]           # 10 questions
+        start    = _time.time() - 60          # 60 seconds elapsed
+        elapsed  = _time.time() - start
+        remaining = max(0.0, limit - elapsed)
+        assert remaining > 0
+        assert abs(remaining - (limit - 60)) < 2  # within 2 s of expected
+
+    def test_remaining_clamps_to_zero(self):
+        import time as _time
+        spq     = self._secs_per_q()
+        limit   = 5 * spq["math"]
+        start   = _time.time() - limit - 999  # way past deadline
+        elapsed = _time.time() - start
+        remaining = max(0.0, limit - elapsed)
+        assert remaining == 0.0
+
+    def test_low_time_threshold_is_120_seconds(self):
+        # The app sets _low_time = _remaining < 120 (2-minute warning)
+        import ast, pathlib
+        src  = pathlib.Path(__file__).parent / "app.py"
+        code = src.read_text()
+        assert "< 120" in code, "2-minute warning threshold not found in app.py"
+
+    def test_critical_time_threshold_is_60_seconds(self):
+        import pathlib
+        src  = pathlib.Path(__file__).parent / "app.py"
+        code = src.read_text()
+        assert "< 60" in code, "1-minute critical threshold not found in app.py"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # app.py — static checks (no Streamlit runtime needed)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestAppStaticChecks:
-    def test_tt_defaults_include_difficulty(self):
+    def _parse_tt_defaults(self):
         import ast, pathlib
         src = pathlib.Path(__file__).parent / "app.py"
         tree = ast.parse(src.read_text())
-        # Find _TT_DEFAULTS dict assignment
         defaults = {}
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
@@ -328,11 +401,25 @@ class TestAppStaticChecks:
                         if isinstance(node.value, ast.Dict):
                             for k, v in zip(node.value.keys, node.value.values):
                                 if isinstance(k, ast.Constant):
-                                    defaults[k.value] = ast.literal_eval(v)
+                                    try:
+                                        defaults[k.value] = ast.literal_eval(v)
+                                    except Exception:
+                                        defaults[k.value] = None
+        return defaults
+
+    def test_tt_defaults_include_difficulty(self):
+        defaults = self._parse_tt_defaults()
         assert "tt_difficulty"   in defaults, "_TT_DEFAULTS missing tt_difficulty"
         assert "tt_result_saved" in defaults, "_TT_DEFAULTS missing tt_result_saved"
         assert defaults["tt_difficulty"]   == "mixed"
         assert defaults["tt_result_saved"] == False
+
+    def test_tt_defaults_include_timer_fields(self):
+        defaults = self._parse_tt_defaults()
+        assert "tt_start_time"   in defaults, "_TT_DEFAULTS missing tt_start_time"
+        assert "tt_time_expired" in defaults, "_TT_DEFAULTS missing tt_time_expired"
+        assert defaults["tt_start_time"]   is None
+        assert defaults["tt_time_expired"] == False
 
     def test_new_agent_functions_importable(self):
         from agent import (

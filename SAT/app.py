@@ -153,7 +153,12 @@ _TT_DEFAULTS = {
     "tt_questions":    [],
     "tt_answers":      {},        # {q_idx: str}
     "tt_result_saved": False,     # guards double-save on rerun
+    "tt_start_time":   None,      # unix timestamp when taking phase started
+    "tt_time_expired": False,     # set True when timer ran out
 }
+
+# Seconds per question matching Digital SAT pace
+_TT_SECS_PER_Q = {"math": 95, "reading_writing": 71}
 for _k, _v in _TT_DEFAULTS.items():
     if _k not in st.session_state:
         st.session_state[_k] = _v
@@ -1574,9 +1579,11 @@ with tab_topic:
                     _tt.tt_phase = "lobby"
                     st.rerun()
             else:
-                _tt.tt_questions = questions
-                _tt.tt_answers   = {}
-                _tt.tt_phase     = "taking"
+                _tt.tt_questions    = questions
+                _tt.tt_answers      = {}
+                _tt.tt_start_time   = time.time()
+                _tt.tt_time_expired = False
+                _tt.tt_phase        = "taking"
                 st.rerun()
         except Exception as e:
             import traceback
@@ -1591,12 +1598,35 @@ with tab_topic:
         topic     = _tt.tt_topic
         questions = _tt.tt_questions
 
+        # ── Timer setup ───────────────────────────────────────────────────────
+        _secs_per_q  = _TT_SECS_PER_Q.get(_tt.tt_subject, 90)
+        _time_limit  = len(questions) * _secs_per_q
+        _start       = _tt.get("tt_start_time") or time.time()
+        if _tt.get("tt_start_time") is None:
+            _tt.tt_start_time = _start
+        _elapsed     = time.time() - _start
+        _remaining   = max(0.0, _time_limit - _elapsed)
+
+        # Auto-submit if time is up (triggered by JS page reload)
+        if _elapsed >= _time_limit and not _tt.get("tt_time_expired"):
+            _tt.tt_time_expired = True
+            _tt.tt_phase        = "reviewing"
+            st.rerun()
+
         _tt_diff      = _tt.get("tt_difficulty", "mixed")
         _diff_colors  = {"mixed": "#6366f1", "easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}
         _diff_dc      = _diff_colors.get(_tt_diff, "#6366f1")
+
+        _timer_mins = int(_remaining // 60)
+        _timer_secs = int(_remaining % 60)
+        _low_time   = _remaining < 120   # last 2 minutes
+        _timer_color = "#ef4444" if _remaining < 60 else "#f59e0b" if _low_time else "#22c55e"
+
         st.markdown(
             f"<div style='background:#1e3a5f;color:#fff;border-radius:10px;"
             f"padding:16px 20px;margin-bottom:16px'>"
+            f"<div style='display:flex;justify-content:space-between;align-items:flex-start'>"
+            f"<div>"
             f"<div style='font-size:0.75rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.08em'>Topic Test</div>"
             f"<div style='display:flex;align-items:center;gap:10px;margin-top:2px'>"
             f"<span style='font-size:1.25rem;font-weight:700'>{topic['label']}</span>"
@@ -1605,15 +1635,53 @@ with tab_topic:
             f"{_tt_diff.capitalize()}</span>"
             f"</div>"
             f"<div style='font-size:0.85rem;opacity:0.8;margin-top:4px'>"
-            f"{len(questions)} questions · no timer · calculator allowed</div>"
-            f"<div style='margin-top:10px;font-size:0.82rem'>"
+            f"{len(questions)} questions · calculator allowed</div>"
+            f"<div style='margin-top:8px;font-size:0.82rem'>"
             f"📖 Review while you work: "
             f"<a href='{topic['ka_url']}' target='_blank' "
             f"style='color:#7dd3fc;text-decoration:underline'>{topic['ka_label']}</a>"
             f"</div>"
+            f"</div>"
+            f"<div style='text-align:right;flex-shrink:0;margin-left:16px'>"
+            f"<div style='font-size:0.7rem;opacity:0.7;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:2px'>Time Remaining</div>"
+            f"<div id='tt-timer' style='font-size:2rem;font-weight:800;color:{_timer_color};"
+            f"font-variant-numeric:tabular-nums;letter-spacing:0.02em'>"
+            f"{_timer_mins:02d}:{_timer_secs:02d}</div>"
+            f"</div>"
+            f"</div>"
             f"</div>",
             unsafe_allow_html=True,
         )
+
+        # JS countdown — ticks from server-computed remaining; reloads page at 0
+        components.html(
+            f"""<script>
+            (function() {{
+              let rem = {int(_remaining)};
+              const el = window.parent.document.getElementById('tt-timer');
+              if (!el) return;
+              const tick = () => {{
+                if (rem <= 0) {{
+                  el.textContent = '00:00';
+                  el.style.color = '#ef4444';
+                  window.parent.location.reload();
+                  return;
+                }}
+                const m = Math.floor(rem / 60);
+                const s = rem % 60;
+                el.textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+                el.style.color = rem < 60 ? '#ef4444' : rem < 120 ? '#f59e0b' : '#22c55e';
+                rem--;
+                setTimeout(tick, 1000);
+              }};
+              tick();
+            }})();
+            </script>""",
+            height=0,
+        )
+
+        if _low_time:
+            st.warning(f"⏰ {'Less than 1 minute' if _remaining < 60 else 'Under 2 minutes'} remaining!")
 
         answered = sum(1 for i in range(len(questions)) if _tt.tt_answers.get(i))
         st.caption(f"✅ {answered}/{len(questions)} answered")
@@ -1730,11 +1798,13 @@ with tab_topic:
 
         _rev_diff     = _tt.get("tt_difficulty", "mixed")
         _rev_dc       = {"mixed": "#6366f1", "easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}.get(_rev_diff, "#6366f1")
+        _timed_out    = _tt.get("tt_time_expired", False)
         st.markdown(
             f"<div style='background:linear-gradient(135deg,#1e3a5f,#2563eb);"
             f"color:#fff;border-radius:14px;padding:24px 28px;text-align:center;margin-bottom:20px'>"
             f"<div style='font-size:0.8rem;opacity:0.75;text-transform:uppercase;"
-            f"letter-spacing:0.1em;margin-bottom:6px'>Topic Test Results</div>"
+            f"letter-spacing:0.1em;margin-bottom:6px'>"
+            f"{'⏰ Time\'s Up — Auto-submitted' if _timed_out else 'Topic Test Results'}</div>"
             f"<div style='display:inline-flex;align-items:center;gap:10px;margin-bottom:8px'>"
             f"<span style='font-size:1.2rem;font-weight:700'>{topic['label']}</span>"
             f"<span style='font-size:0.7em;font-weight:600;padding:2px 8px;border-radius:20px;"
@@ -1821,9 +1891,13 @@ with tab_topic:
                 _tt.tt_questions    = []
                 _tt.tt_answers      = {}
                 _tt.tt_result_saved = False
+                _tt.tt_start_time   = None
+                _tt.tt_time_expired = False
                 _tt.tt_phase        = "generating"
                 st.rerun()
         with col_new:
             if st.button("← Choose New Topic", use_container_width=True):
-                _tt.tt_phase = "lobby"
+                _tt.tt_start_time   = None
+                _tt.tt_time_expired = False
+                _tt.tt_phase        = "lobby"
                 st.rerun()
