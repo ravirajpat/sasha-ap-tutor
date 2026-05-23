@@ -53,56 +53,480 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Global CSS ────────────────────────────────────────────────────────────────
+# ── Global CSS — College Board design system ───────────────────────────────────
 st.markdown(
     """
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;0,800;1,400&display=swap');
+
+    /* ════════════════════════════════════════════════
+       College Board Design System
+       Primary Navy  #00539B   Bright Blue  #0077C8
+       Red           #C8102E   Text         #1A1A1A
+       Gray          #6D6D6D   Border       #D1D1D1
+       Light BG      #F5F5F5   White        #FFFFFF
+    ════════════════════════════════════════════════ */
+
+    /* ── Force Open Sans on every element ── */
+    *, *::before, *::after,
+    html, body, .stApp, .stMarkdown,
+    [class*="st-"], [class*="css-"],
+    button, input, textarea, select, option,
+    h1, h2, h3, h4, h5, h6, p, span, div, li, a, label {
+        font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    }
+
+    /* ── White page background ── */
+    html, body,
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    [data-testid="stMainBlockContainer"],
+    .main, .block-container { background: #FFFFFF !important; }
+    /* ── Streamlit chrome cleanup ── */
+    [data-testid="stDecoration"]        { display: none !important; }
+    /* Keep stHeader so sidebar toggle stays functional — just make it invisible */
+    [data-testid="stHeader"]            { background: transparent !important;
+                                          height: 0 !important;
+                                          min-height: 0 !important;
+                                          overflow: visible !important; }
+    /* Hide only the toolbar actions (Deploy, share icons) not the sidebar pin */
+    [data-testid="stToolbarActions"]    { display: none !important; }
+    [data-testid="stToolbar"]           { display: none !important; }
+    .stDeployButton                     { display: none !important; }
+    #MainMenu                           { display: none !important; }
+    footer                              { display: none !important; }
+
+    /* Sidebar collapse/expand button — keep it accessible */
+    [data-testid="collapsedControl"],
+    button[data-testid="baseButton-headerNoPadding"] {
+        background: #00539B !important;
+        color: #FFFFFF !important;
+        border-radius: 0 4px 4px 0 !important;
+        z-index: 999 !important;
+    }
+
+    /* ── Main content — no top padding (custom header takes that space) ── */
+    .block-container { padding-top: 0 !important; max-width: 100% !important;
+                       padding-left: 1.5rem !important; padding-right: 1.5rem !important; }
+
+    /* ── Base text ── */
+    body, .stMarkdown, [data-testid="stMarkdownContainer"] { color: #1A1A1A !important; }
+    p, li { color: #1A1A1A !important; line-height: 1.6 !important; }
+    a { color: #0077C8 !important; }
+    a:hover { color: #00539B !important; text-decoration: underline !important; }
+
+    /* ── Headings — CB Navy, Open Sans Bold ── */
+    h1, h2, h3,
+    [data-testid="stHeading"] h1,
+    [data-testid="stHeading"] h2,
+    [data-testid="stHeading"] h3 {
+        color: #00539B !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.01em !important;
+    }
+    /* Main content subheaders only — NOT sidebar */
+    [data-testid="stMain"] [data-testid="stSubheader"],
+    [data-testid="stMain"] [data-testid="stSubheader"] * {
+        color: #00539B !important;
+        font-weight: 700 !important;
+        font-size: 1.1rem !important;
+        padding-bottom: 6px !important;
+        border-bottom: 2px solid #D1D1D1 !important;
+        margin-bottom: 12px !important;
+    }
+    [data-testid="stCaptionContainer"],
+    [data-testid="stCaptionContainer"] * { color: #6D6D6D !important; font-size: 0.82rem !important; }
+
+    /* ════════════════════════════════════════════════
+       SIDEBAR — College Board Navy
+    ════════════════════════════════════════════════ */
+    section[data-testid="stSidebar"] {
+        background: #00539B !important;
+        border-right: none !important;
+        box-shadow: 2px 0 8px rgba(0,0,0,0.12) !important;
+    }
+    section[data-testid="stSidebar"] > div:first-child { padding-top: 0 !important; }
+    section[data-testid="stSidebar"] *:not(button):not([data-testid="baseButton-primary"]):not([data-testid="baseButton-secondary"]) {
+        color: #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stSubheader"],
+    section[data-testid="stSidebar"] [data-testid="stSubheader"] * {
+        color: #BFD9F0 !important;
+        border-bottom: 1px solid rgba(255,255,255,0.15) !important;
+        padding-bottom: 4px !important;
+        margin-bottom: 8px !important;
+        font-size: 0.68rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.12em !important;
+        background: transparent !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stMetricValue"] {
+        color: #FFFFFF !important; font-size: 2rem !important; font-weight: 800 !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stMetricDelta"] { color: #BFD9F0 !important; }
+    section[data-testid="stSidebar"] [data-testid="stMetricLabel"] { color: #BFD9F0 !important; }
+    section[data-testid="stSidebar"] [data-testid="stProgress"] > div {
+        background: rgba(255,255,255,0.25) !important; border-radius: 4px !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stProgress"] > div > div {
+        background: #FFFFFF !important; border-radius: 4px !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stExpander"] {
+        background: rgba(255,255,255,0.1) !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        border-radius: 6px !important;
+    }
+    section[data-testid="stSidebar"] hr,
+    section[data-testid="stSidebar"] [data-testid="stHorizontalBlock"] hr { border-color: rgba(255,255,255,0.2) !important; }
+    section[data-testid="stSidebar"] [data-testid="stAlertContainer"] {
+        background: rgba(255,255,255,0.12) !important;
+        border-left-color: rgba(255,255,255,0.6) !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] * { color: #BFD9F0 !important; }
+
+    /* Sidebar buttons */
+    section[data-testid="stSidebar"] button {
+        font-family: 'Open Sans', sans-serif !important;
+        font-weight: 700 !important;
+        border-radius: 4px !important;
+        min-height: 40px !important;
+        font-size: 0.85rem !important;
+        letter-spacing: 0.01em !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] {
+        background: #FFFFFF !important;
+        color: #00539B !important;
+        border: 2px solid #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] p {
+        color: #00539B !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-primary"]:hover {
+        background: #E8F1F9 !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
+        background: transparent !important;
+        border: 2px solid rgba(255,255,255,0.5) !important;
+        color: #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] p {
+        color: #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"]:hover {
+        background: rgba(255,255,255,0.15) !important;
+        border-color: #FFFFFF !important;
+    }
+
+    /* ════════════════════════════════════════════════
+       BUTTONS — College Board Style
+       Targets every possible Streamlit button selector
+       to guarantee color override over emotion-cache.
+    ════════════════════════════════════════════════ */
+
+    /* Base reset for ALL Streamlit buttons */
+    button[data-testid],
+    button[kind] {
+        font-family: 'Open Sans', sans-serif !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.01em !important;
+        border-radius: 4px !important;
+        cursor: pointer !important;
+        transition: background 0.15s, border-color 0.15s !important;
+    }
+
+    /* ── PRIMARY button: CB blue, WHITE text ── */
+    button[data-testid="baseButton-primary"],
+    button[kind="primary"] {
+        background-color: #0077C8 !important;
+        border: 2px solid #0077C8 !important;
+        color: #FFFFFF !important;
+        min-height: 44px !important;
+        font-size: 0.9rem !important;
+        box-shadow: 0 2px 6px rgba(0,83,155,0.25) !important;
+    }
+    /* Force white on every child element inside primary buttons */
+    button[data-testid="baseButton-primary"] *,
+    button[kind="primary"] * {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+        font-size: 0.9rem !important;
+    }
+    button[data-testid="baseButton-primary"]:hover,
+    button[kind="primary"]:hover {
+        background-color: #005fa3 !important;
+        border-color: #005fa3 !important;
+        box-shadow: 0 3px 10px rgba(0,83,155,0.35) !important;
+    }
+
+    /* ── SECONDARY button: white bg, CB navy text+border ── */
+    button[data-testid="baseButton-secondary"],
+    button[kind="secondary"] {
+        background-color: #FFFFFF !important;
+        border: 2px solid #0077C8 !important;
+        color: #00539B !important;
+        min-height: 40px !important;
+        font-size: 0.85rem !important;
+    }
+    button[data-testid="baseButton-secondary"] *,
+    button[kind="secondary"] * {
+        color: #00539B !important;
+        font-weight: 700 !important;
+        font-size: 0.85rem !important;
+    }
+    button[data-testid="baseButton-secondary"]:hover,
+    button[kind="secondary"]:hover {
+        background-color: #E8F1F9 !important;
+        border-color: #00539B !important;
+    }
+    button[data-testid="baseButton-secondary"]:hover *,
+    button[kind="secondary"]:hover * {
+        color: #00539B !important;
+    }
+
+    /* Sidebar primary = white bg + navy text (inverted) */
+    section[data-testid="stSidebar"] button[data-testid="baseButton-primary"],
+    section[data-testid="stSidebar"] button[kind="primary"] {
+        background-color: #FFFFFF !important;
+        border-color: #FFFFFF !important;
+        color: #00539B !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-primary"] *,
+    section[data-testid="stSidebar"] button[kind="primary"] * {
+        color: #00539B !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"],
+    section[data-testid="stSidebar"] button[kind="secondary"] {
+        background-color: transparent !important;
+        border-color: rgba(255,255,255,0.55) !important;
+        color: #FFFFFF !important;
+    }
+    section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] *,
+    section[data-testid="stSidebar"] button[kind="secondary"] * {
+        color: #FFFFFF !important;
+    }
+
+    /* ════════════════════════════════════════════════
+       TABS — CB navigation underline style
+    ════════════════════════════════════════════════ */
+    [data-testid="stTabs"] [role="tablist"] {
+        overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch;
+        background: #FFFFFF !important;
+        border-bottom: 2px solid #D1D1D1 !important;
+        gap: 0 !important;
+        padding: 0 !important;
+    }
+    [data-testid="stTabs"] [role="tab"] {
+        color: #6D6D6D !important;
+        font-weight: 600 !important;
+        font-size: 0.88rem !important;
+        padding: 10px 18px !important;
+        border-radius: 0 !important;
+        border-bottom: 3px solid transparent !important;
+        margin-bottom: -2px !important;
+        letter-spacing: 0.01em !important;
+        transition: color 0.15s, border-color 0.15s !important;
+    }
+    [data-testid="stTabs"] [role="tab"] p { color: inherit !important; font-size: inherit !important; font-weight: inherit !important; }
+    [data-testid="stTabs"] [role="tab"][aria-selected="true"] {
+        color: #00539B !important;
+        border-bottom: 3px solid #00539B !important;
+        background: transparent !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stTabs"] [role="tab"][aria-selected="true"] p { color: #00539B !important; font-weight: 700 !important; }
+    [data-testid="stTabs"] [role="tab"]:hover {
+        color: #0077C8 !important;
+        background: #F0F7FF !important;
+        border-bottom-color: #BFD9F0 !important;
+    }
+
+    /* ════════════════════════════════════════════════
+       FORM ELEMENTS — CB clean inputs
+    ════════════════════════════════════════════════ */
+    /* Labels above inputs */
+    [data-testid="stTextInput"] label,
+    [data-testid="stSelectbox"] label,
+    [data-testid="stMultiSelect"] label,
+    [data-testid="stRadio"] label,
+    [data-testid="stSlider"] label,
+    [data-testid="stNumberInput"] label,
+    [data-testid="stToggle"] label {
+        font-size: 0.78rem !important;
+        font-weight: 700 !important;
+        color: #1A1A1A !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.06em !important;
+    }
+
+    /* Text inputs */
+    input[type="text"], input[type="number"],
+    [data-testid="stTextInput"] input,
+    [data-testid="stNumberInput"] input {
+        border: 1.5px solid #D1D1D1 !important;
+        border-radius: 4px !important;
+        background: #FFFFFF !important;
+        color: #1A1A1A !important;
+        padding: 8px 12px !important;
+        font-size: 0.9rem !important;
+    }
+    input:focus, textarea:focus {
+        border-color: #0077C8 !important;
+        box-shadow: 0 0 0 3px rgba(0,119,200,0.15) !important;
+        outline: none !important;
+    }
+
+    /* Textarea / chat */
+    [data-testid="stChatInput"] textarea, textarea {
+        border: 1.5px solid #D1D1D1 !important;
+        border-radius: 4px !important;
+        background: #FFFFFF !important;
+        color: #1A1A1A !important;
+        font-size: 0.9rem !important;
+    }
+    [data-testid="stChatInput"] textarea:focus { border-color: #0077C8 !important; box-shadow: 0 0 0 3px rgba(0,119,200,0.15) !important; }
+
+    /* Selectbox */
+    [data-testid="stSelectbox"] div[data-baseweb="select"] > div,
+    [data-testid="stMultiSelect"] div[data-baseweb="select"] > div {
+        border: 1.5px solid #D1D1D1 !important;
+        border-radius: 4px !important;
+        background: #FFFFFF !important;
+        color: #1A1A1A !important;
+    }
+
+    /* Radio options */
+    [data-testid="stRadio"] > div { gap: 6px !important; }
+    [data-testid="stRadio"] label { font-size: 0.9rem !important; font-weight: 400 !important; text-transform: none !important; letter-spacing: 0 !important; color: #1A1A1A !important; }
+    [data-testid="stRadio"] [data-baseweb="radio"] input[type="radio"]:checked + div { background: #0077C8 !important; border-color: #0077C8 !important; }
+
+    /* Slider */
+    [data-testid="stSlider"] [data-baseweb="slider"] [role="slider"] { background: #0077C8 !important; border-color: #0077C8 !important; }
+    [data-testid="stSlider"] [data-baseweb="slider"] div[data-testid*="track"] > div:first-child { background: #0077C8 !important; }
+
+    /* Toggle */
+    [data-testid="stToggle"] input:checked + div { background: #0077C8 !important; }
+
+    /* ════════════════════════════════════════════════
+       METRICS & PROGRESS
+    ════════════════════════════════════════════════ */
+    [data-testid="stMetricValue"] { color: #00539B !important; font-weight: 800 !important; font-size: 1.8rem !important; }
+    [data-testid="stMetricLabel"] { color: #6D6D6D !important; font-size: 0.78rem !important; font-weight: 600 !important; text-transform: uppercase !important; letter-spacing: 0.05em !important; }
+    [data-testid="stMetricDelta"] { font-size: 0.8rem !important; }
+
+    [data-testid="stProgress"] > div {
+        background: #E8F1F9 !important;
+        border-radius: 6px !important;
+        height: 8px !important;
+    }
+    [data-testid="stProgress"] > div > div {
+        background: #0077C8 !important;
+        border-radius: 6px !important;
+        height: 8px !important;
+    }
+
+    /* ════════════════════════════════════════════════
+       CARDS & CONTAINERS
+    ════════════════════════════════════════════════ */
+    /* Expanders as cards */
+    [data-testid="stExpander"] {
+        border: 1px solid #D1D1D1 !important;
+        border-radius: 6px !important;
+        background: #FFFFFF !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.05) !important;
+        overflow: hidden !important;
+    }
+    [data-testid="stExpander"] summary {
+        font-weight: 600 !important;
+        color: #1A1A1A !important;
+        padding: 12px 16px !important;
+        background: #FAFAFA !important;
+        border-bottom: 1px solid #E8E8E8 !important;
+    }
+    [data-testid="stExpander"] summary:hover { background: #F0F7FF !important; }
+
+    /* Chat messages */
+    [data-testid="stChatMessage"] {
+        background: #F5F5F5 !important;
+        border-radius: 8px !important;
+        border: 1px solid #E8E8E8 !important;
+        margin-bottom: 8px !important;
+    }
+    /* Assistant message: slight blue tint */
+    [data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+        background: #F0F7FF !important;
+        border-color: #D0E8F8 !important;
+    }
+
+    /* ════════════════════════════════════════════════
+       ALERT BANNERS
+    ════════════════════════════════════════════════ */
+    [data-testid="stAlertContainer"] {
+        border-radius: 6px !important;
+        border: none !important;
+        border-left: 4px solid !important;
+        font-size: 0.88rem !important;
+    }
+    [data-testid="stAlertContainer"][data-baseweb="notification"] {
+        background: #E8F1F9 !important;
+        border-left-color: #0077C8 !important;
+    }
+    [data-testid="stAlertContainer"][kind="warning"] {
+        background: #FFF8E6 !important;
+        border-left-color: #F5A623 !important;
+    }
+    [data-testid="stAlertContainer"][kind="error"] {
+        background: #FDE8EA !important;
+        border-left-color: #C8102E !important;
+    }
+    [data-testid="stAlertContainer"][kind="success"] {
+        background: #E6F4EA !important;
+        border-left-color: #2D8C4E !important;
+    }
+
+    /* ════════════════════════════════════════════════
+       MISC
+    ════════════════════════════════════════════════ */
+    hr { border: none !important; border-top: 1px solid #D1D1D1 !important; margin: 16px 0 !important; }
+
+    /* Quick-action links */
+    a[href*="?action="] { transition: color 0.15s; }
+    a[href*="?action="]:hover { text-decoration: underline !important; }
+
+    /* Focus rings — CB blue */
+    button:focus-visible, a:focus-visible, input:focus-visible, [role="tab"]:focus-visible {
+        outline: 2px solid #0077C8 !important;
+        outline-offset: 2px !important;
+    }
+
+    /* Status widget */
+    [data-testid="stStatusWidget"] { border-radius: 6px !important; font-size: 0.85rem !important; }
+
+    /* Download button */
+    [data-testid="stDownloadButton"] button {
+        background: #0077C8 !important;
+        border: 2px solid #0077C8 !important;
+        color: #FFFFFF !important;
+        border-radius: 4px !important;
+        font-weight: 700 !important;
+    }
+    [data-testid="stDownloadButton"] button p { color: #FFFFFF !important; }
+    [data-testid="stDownloadButton"] button:hover { background: #00539B !important; border-color: #00539B !important; }
+
+    /* Code blocks */
+    [data-testid="stCode"], .stCode { border-radius: 6px !important; }
+
+    /* ── Skip link ── */
     .skip-link {
         position: absolute; left: -9999px; top: 0.5rem; z-index: 9999;
-        background: #0ea5e9; color: #fff !important;
-        padding: 0.4rem 0.9rem; border-radius: 0.4rem;
+        background: #00539B; color: #fff !important;
+        padding: 0.4rem 0.9rem; border-radius: 4px;
         font-size: 0.85rem; text-decoration: none;
     }
     .skip-link:focus { left: 1rem; }
 
-    [data-testid="stDecoration"] { display: none !important; }
-    header[data-testid="stHeader"] { background: transparent !important; }
-    .block-container { padding-top: 1rem !important; }
-    section[data-testid="stSidebar"] > div:first-child { padding-top: 0.75rem !important; }
-
-    button[data-testid="baseButton-secondary"] {
-        background: transparent !important;
-        border: 1px solid rgba(49,51,63,0.5) !important;
-        color: rgb(49,51,63) !important;
-        font-size: 0.8rem !important;
-        font-weight: 400 !important;
-        min-height: 30px !important;
-        padding: 2px 10px !important;
-        border-radius: 0.4rem !important;
-        touch-action: manipulation;
-    }
-    button[data-testid="baseButton-secondary"]:hover {
-        background: rgba(49,51,63,0.08) !important;
-        border-color: rgba(49,51,63,0.7) !important;
-    }
-    a[href*="?action="] { transition: opacity 0.15s; }
-    a[href*="?action="]:hover { text-decoration: underline !important; opacity: 0.75; }
-
-    button:focus-visible, a:focus-visible {
-        outline: 2px solid #0ea5e9 !important;
-        outline-offset: 2px !important;
-    }
-    section[data-testid="stSidebar"] button[data-testid="baseButton-secondary"] {
-        font-size: 0.85rem !important;
-        min-height: 38px !important;
-        padding: 4px 12px !important;
-    }
-    button[data-testid="baseButton-primary"] { touch-action: manipulation; }
-
-    [data-testid="stTabs"] [role="tablist"] {
-        overflow-x: auto; white-space: nowrap; -webkit-overflow-scrolling: touch;
-    }
-
+    /* ── Mobile ── */
     @media screen and (max-width: 600px) {
         .block-container {
             padding-left: 0.5rem !important;
@@ -189,9 +613,20 @@ q_done    = get_today_questions(cfg)
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 
 with st.sidebar:
-    st.title("🎯 Sasha's SAT Tutor")
+    st.markdown(
+        "<div style='background:#00539B;padding:10px 0 6px'>"
+        "<div style='font-size:1.25rem;font-weight:800;color:#FFFFFF;letter-spacing:-0.01em'>🎯 Sasha's SAT Tutor</div>"
+        "<div style='font-size:0.7rem;color:#BFD9F0;margin-top:2px;text-transform:uppercase;letter-spacing:0.08em'>College Board Prep</div>"
+        "</div>",
+        unsafe_allow_html=True,
+    )
 
-    st.subheader("Section")
+    st.markdown(
+        "<p style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
+        "letter-spacing:0.12em;color:rgba(191,217,240,0.9);margin:4px 0 6px;"
+        "padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.15)'>Section</p>",
+        unsafe_allow_html=True,
+    )
     s_col1, s_col2 = st.columns(2)
     with s_col1:
         if st.button("📐 Math", use_container_width=True,
@@ -215,12 +650,17 @@ with st.sidebar:
 
     st.divider()
 
-    st.subheader("Domain Progress")
+    st.markdown(
+        "<p style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
+        "letter-spacing:0.12em;color:rgba(191,217,240,0.9);margin:4px 0 6px;"
+        "padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.15)'>Domain Progress</p>",
+        unsafe_allow_html=True,
+    )
     data = load_performance(cfg)
 
     LEVEL_COLORS = {
-        0: "#888888", 1: "#e74c3c", 2: "#e67e22",
-        3: "#f1c40f", 4: "#2ecc71", 5: "#00b4d8",
+        0: "#BFD9F0", 1: "#C8102E", 2: "#E8851A",
+        3: "#F5A623", 4: "#2D8C4E", 5: "#0077C8",
     }
 
     for unit in cfg.units:
@@ -235,15 +675,20 @@ with st.sidebar:
         caption = f"{int((correct/total)*100)}% · {lbl}" if total > 0 else "Not yet tested"
         st.markdown(
             f"<div style='margin-bottom:4px'>"
-            f"<span style='font-size:0.78em;color:#ccc'>{unit} <span style='color:#888'>({weight}%)</span></span><br>"
+            f"<span style='font-size:0.78em;color:#BFD9F0'>{unit} <span style='color:#9DC8E8'>({weight}%)</span></span><br>"
             f"<span style='font-family:monospace;color:{color}'>{bar}</span> "
-            f"<span style='font-size:0.75em;color:#aaa'>{caption}</span>"
+            f"<span style='font-size:0.75em;color:#D0E8F8'>{caption}</span>"
             f"</div>",
             unsafe_allow_html=True,
         )
 
     st.divider()
-    st.subheader("Today's Practice")
+    st.markdown(
+        "<p style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
+        "letter-spacing:0.12em;color:rgba(191,217,240,0.9);margin:4px 0 6px;"
+        "padding-bottom:4px;border-bottom:1px solid rgba(255,255,255,0.15)'>Today's Practice</p>",
+        unsafe_allow_html=True,
+    )
     st.progress(min(q_done / MIN_QUESTIONS, 1.0))
     if q_done >= MIN_QUESTIONS:
         st.success(f"✅ {q_done}/{MIN_QUESTIONS} questions — great work today!")
@@ -439,34 +884,146 @@ if _concepts == "true" and _concept_subj in AGENTS:
 st.markdown('<a class="skip-link" href="#main-content">Skip to chat</a>', unsafe_allow_html=True)
 
 _goal_icon = "✅" if q_done >= MIN_QUESTIONS else "📝"
+_SECTION_COLOR = {"math": "#0077C8", "reading_writing": "#2D8C4E"}
+_sec_color  = _SECTION_COLOR.get(st.session_state.active_agent, "#0077C8")
+_goal_pct   = min(int(q_done / MIN_QUESTIONS * 100), 100)
+_days_color = "#C8102E" if days_left <= 14 else "#FFFFFF"
 
-# Accent color per section
-_ACCENT = {"math": "#0ea5e9", "reading_writing": "#10b981"}
-_ls_color = _ACCENT.get(st.session_state.active_agent, "#0ea5e9")
-_ls = f"color:{_ls_color};text-decoration:none;font-size:0.8rem;white-space:nowrap"
+# Handle section switch from the tier-2 header switcher
+_switch = st.query_params.get("switch_section", "")
+if _switch in AGENTS and _switch != st.session_state.active_agent:
+    st.query_params.clear()
+    st.session_state.active_agent = _switch
+    st.rerun()
 
+# Active/inactive colors for section switcher pills
+_is_math  = st.session_state.active_agent == "math"
+math_bg   = "#0077C8" if _is_math  else "#FFFFFF"
+math_txt  = "#FFFFFF"  if _is_math  else "#0077C8"
+rw_bg     = "#0077C8" if not _is_math else "#FFFFFF"
+rw_txt    = "#FFFFFF"  if not _is_math else "#0077C8"
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Custom two-tier header  (Streamlit's own toolbar is hidden via CSS above)
+# Tier 1 — Brand bar (dark navy, 56px): logo + countdown + "Practice Test" CTA
+# Tier 2 — Quick-action bar (white, 44px): large readable nav links
+# ══════════════════════════════════════════════════════════════════════════════
 st.markdown(
-    f"<div style='display:flex;align-items:center;flex-wrap:wrap;"
-    f"gap:0.4rem 1rem;padding:6px 0 4px'>"
-    f"<span style='font-size:1.25rem;font-weight:700;line-height:1.2'>"
-    f"{cfg.icon} {cfg.display_name} Tutor</span>"
-    f"<span style='font-size:0.78rem;color:#888;white-space:nowrap' "
-    f"title='Days until SAT'>⏳ {days_left}d left</span>"
-    f"<span style='font-size:0.78rem;color:#888;white-space:nowrap' "
-    f"title='Questions answered today vs daily goal'>{_goal_icon} {q_done}/{MIN_QUESTIONS} today</span>"
-    f"<span style='margin-left:auto;display:flex;align-items:center;"
-    f"gap:0.25rem 0.6rem;flex-wrap:wrap'>"
-    f"<a href='?action=schedule' style='{_ls}' title='Get a personalised study schedule'>📅 Schedule</a>"
-    f"<span style='color:#ccc'>·</span>"
-    f"<a href='?action=weak' style='{_ls}' title='See your weak topics'>⚠️ Weak Topics</a>"
-    f"<span style='color:#ccc'>·</span>"
-    f"<a href='?action=report' style='{_ls}' title='View full progress report'>📊 Report</a>"
-    f"<span style='color:#ccc'>·</span>"
-    f"<a href='?action=diagnose' style='{_ls}' title='Run a diagnostic'>🧪 Diagnose</a>"
-    f"<span style='color:#ccc'>·</span>"
-    f"<a href='?action=practice' style='{_ls}' title='Generate a printable practice test PDF'>📄 Practice Test</a>"
-    f"</span>"
-    f"</div>",
+    f"""
+    <!-- ░░ TIER 1 — Brand bar ░░ -->
+    <div style='
+        background:#00539B;
+        padding:0 24px;
+        display:flex;
+        flex-direction:row;
+        align-items:center;
+        justify-content:flex-start;
+        min-height:56px;
+        gap:0;
+        margin: 0 -1.5rem;
+        box-sizing:border-box;
+    '>
+      <!-- Logo + section name -->
+      <div style='display:flex;align-items:center;gap:10px;flex:1'>
+        <span style='font-size:1.25rem;font-weight:800;color:#FFFFFF;
+                     letter-spacing:-0.02em;line-height:1'>
+          {cfg.icon}&nbsp;{cfg.display_name} Tutor
+        </span>
+        <span style='background:rgba(255,255,255,0.2);color:#FFFFFF;
+                     font-size:0.6rem;font-weight:700;text-transform:uppercase;
+                     letter-spacing:0.12em;padding:3px 8px;border-radius:2px'>
+          SAT&nbsp;PREP
+        </span>
+      </div>
+
+      <!-- Stats pills -->
+      <div style='display:flex;align-items:center;gap:8px;flex-shrink:0;margin-left:20px'>
+        <span style='background:rgba(255,255,255,0.15);color:#FFFFFF;font-size:0.78rem;
+                     font-weight:600;padding:5px 12px;border-radius:20px;white-space:nowrap'>
+          ⏳ {days_left}d to exam
+        </span>
+        <span style='background:rgba(255,255,255,0.15);color:#FFFFFF;font-size:0.78rem;
+                     font-weight:600;padding:5px 12px;border-radius:20px;white-space:nowrap'>
+          {_goal_icon} {q_done}/{MIN_QUESTIONS} today
+        </span>
+      </div>
+
+    </div>
+
+    <!-- ░░ TIER 2 — Section switcher + quick actions ░░ -->
+    <div style='
+        background:#FFFFFF;
+        border-bottom:2px solid #D1D1D1;
+        padding:0 24px;
+        display:flex;
+        align-items:center;
+        min-height:50px;
+        gap:8px;
+        flex-wrap:wrap;
+        margin: 0 -1.5rem 16px;
+    '>
+      <!-- Section switcher — always visible, primary navigation -->
+      <div style='display:flex;align-items:center;gap:0;border:2px solid #0077C8;
+                  border-radius:5px;overflow:hidden;flex-shrink:0;margin-right:12px'>
+        <a href='?switch_section=math'
+           style='display:inline-flex;align-items:center;gap:6px;
+                  background:{math_bg};color:{math_txt};
+                  font-size:0.85rem;font-weight:700;
+                  padding:8px 16px;text-decoration:none;white-space:nowrap;
+                  border-right:1px solid #0077C8'>
+          📐 Math
+        </a>
+        <a href='?switch_section=reading_writing'
+           style='display:inline-flex;align-items:center;gap:6px;
+                  background:{rw_bg};color:{rw_txt};
+                  font-size:0.85rem;font-weight:700;
+                  padding:8px 16px;text-decoration:none;white-space:nowrap'>
+          📖 Reading &amp; Writing
+        </a>
+      </div>
+
+      <!-- Divider -->
+      <span style='width:1px;height:24px;background:#D1D1D1;display:inline-block;margin:0 4px;flex-shrink:0'></span>
+
+      <!-- Quick actions -->
+      <a href='?action=schedule'
+         style='display:inline-flex;align-items:center;gap:5px;
+                color:#00539B;text-decoration:none;font-size:0.82rem;font-weight:600;
+                padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
+                background:#F5F5F5;white-space:nowrap'
+         onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
+         onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
+        📅 Schedule
+      </a>
+      <a href='?action=weak'
+         style='display:inline-flex;align-items:center;gap:5px;
+                color:#00539B;text-decoration:none;font-size:0.82rem;font-weight:600;
+                padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
+                background:#F5F5F5;white-space:nowrap'
+         onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
+         onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
+        ⚠️ Weak Topics
+      </a>
+      <a href='?action=report'
+         style='display:inline-flex;align-items:center;gap:5px;
+                color:#00539B;text-decoration:none;font-size:0.82rem;font-weight:600;
+                padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
+                background:#F5F5F5;white-space:nowrap'
+         onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
+         onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
+        📊 Report
+      </a>
+      <a href='?action=diagnose'
+         style='display:inline-flex;align-items:center;gap:5px;
+                color:#00539B;text-decoration:none;font-size:0.82rem;font-weight:600;
+                padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
+                background:#F5F5F5;white-space:nowrap'
+         onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
+         onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
+        🧪 Diagnose
+      </a>
+    </div>
+    """,
     unsafe_allow_html=True,
 )
 
@@ -480,11 +1037,20 @@ tab_chat, tab_formulas, tab_calc, tab_tests, tab_topic = st.tabs(
 with tab_formulas:
     active_sheet = FORMULA_SHEETS[st.session_state.active_agent]
     if st.session_state.active_agent == "math":
-        st.subheader("SAT Math — Formula Reference")
-        st.caption("Key formulas organized by domain. The SAT provides area/volume formulas — everything else you need to memorize!")
+        _sheet_title = "SAT Math — Formula Reference"
+        _sheet_sub   = "Key formulas organized by domain. The SAT provides area/volume formulas on the actual test — everything else must be memorized."
     else:
-        st.subheader("SAT Reading & Writing — Strategy Reference")
-        st.caption("Core strategies and grammar rules for every question type. Keep this open while you practice!")
+        _sheet_title = "SAT Reading & Writing — Strategy Reference"
+        _sheet_sub   = "Core strategies and grammar rules for every question type. Keep this open while you practice!"
+    st.markdown(
+        f"<div style='margin:16px 0 20px'>"
+        f"<h2 style='color:#00539B;font-size:1.35rem;font-weight:800;margin:0 0 4px;"
+        f"font-family:\"Open Sans\",sans-serif'>{_sheet_title}</h2>"
+        f"<p style='color:#6D6D6D;font-size:0.85rem;margin:0;font-family:\"Open Sans\",sans-serif'>{_sheet_sub}</p>"
+        f"<div style='height:3px;background:linear-gradient(90deg,#00539B,#0077C8);border-radius:2px;margin-top:10px'></div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
     cards_html = ""
     for unit_name, unit_data in active_sheet.items():
@@ -493,24 +1059,25 @@ with tab_formulas:
         tip   = unit_data["tips"]
         rows  = "".join(
             f"<tr>"
-            f"<td style='color:#bbb;font-size:0.8em;padding:3px 10px 3px 0;"
+            f"<td style='color:#6D6D6D;font-size:0.8em;padding:3px 10px 3px 0;"
             f"white-space:nowrap;vertical-align:top'>{lbl}</td>"
             f"<td style='font-family:monospace;font-size:0.85em;padding:3px 0;"
-            f"color:#f0f0f0;word-break:break-word'>{fml}</td>"
+            f"color:#1A1A1A;word-break:break-word'>{fml}</td>"
             f"</tr>"
             for lbl, fml in unit_data["formulas"]
         )
         cards_html += (
             f"<div role='region' aria-label='{unit_name}' "
-            f"style='background:#0e1117;border:1px solid #2a2a3e;"
-            f"border-radius:10px;padding:14px 16px;'>"
+            f"style='background:#FFFFFF;border:1px solid #D1D1D1;"
+            f"border-radius:8px;padding:14px 16px;"
+            f"box-shadow:0 1px 4px rgba(0,0,0,0.06);'>"
             f"<div style='border-left:4px solid {color};padding:4px 10px;margin-bottom:8px'>"
             f"<span role='heading' aria-level='3' "
             f"style='font-size:1em;font-weight:700;color:{color}'>{icon} {unit_name}</span>"
             f"</div>"
             f"<table style='width:100%;border-collapse:collapse' role='table'>{rows}</table>"
-            f"<div role='note' style='font-size:0.78em;color:#b0b0b0;background:#12121f;"
-            f"border-radius:5px;padding:6px 9px;margin-top:8px'>💡 {tip}</div>"
+            f"<div role='note' style='font-size:0.78em;color:#6D6D6D;background:#F5F5F5;"
+            f"border-radius:5px;padding:6px 9px;margin-top:8px;border-left:3px solid {color}'>💡 {tip}</div>"
             f"</div>"
         )
 
@@ -524,106 +1091,240 @@ with tab_formulas:
 # ── Calculator Tab ────────────────────────────────────────────────────────────
 
 with tab_calc:
-    if "calc_expr" not in st.session_state:
-        st.session_state.calc_expr = ""
-    if "calc_result" not in st.session_state:
-        st.session_state.calc_result = ""
-    if "calc_deg" not in st.session_state:
-        st.session_state.calc_deg = True
+    # Pure HTML/JS calculator — uniform 5-column grid, all buttons same size
+    components.html("""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+         background: #fff; padding: 0; }
 
-    def _make_ctx(deg_mode: bool) -> dict:
-        if deg_mode:
-            trig = {
-                "sin":  lambda x: math.sin(math.radians(x)),
-                "cos":  lambda x: math.cos(math.radians(x)),
-                "tan":  lambda x: math.tan(math.radians(x)),
-                "asin": lambda x: math.degrees(math.asin(x)),
-                "acos": lambda x: math.degrees(math.acos(x)),
-                "atan": lambda x: math.degrees(math.atan(x)),
-            }
-        else:
-            trig = {
-                "sin": math.sin, "cos": math.cos, "tan": math.tan,
-                "asin": math.asin, "acos": math.acos, "atan": math.atan,
-            }
-        trig.update({
-            "sqrt": math.sqrt, "log": math.log10, "ln": math.log,
-            "abs": abs, "pi": math.pi, "e": math.e,
-            "floor": math.floor, "ceil": math.ceil,
-        })
-        return trig
+  .calc-wrap { max-width: 500px; }
 
-    def _calc_press(val: str):
-        if val == "C":
-            st.session_state.calc_expr = ""
-            st.session_state.calc_result = ""
-        elif val == "⌫":
-            st.session_state.calc_expr = st.session_state.calc_expr[:-1]
-            st.session_state.calc_result = ""
-        elif val == "=":
-            try:
-                expr = (
-                    st.session_state.calc_expr
-                    .replace("^", "**")
-                    .replace("π", "pi")
-                    .replace("√(", "sqrt(")
-                )
-                ctx = _make_ctx(st.session_state.calc_deg)
-                raw = eval(expr, {"__builtins__": {}}, ctx)  # noqa: S307
-                if isinstance(raw, float) and raw.is_integer():
-                    st.session_state.calc_result = str(int(raw))
-                else:
-                    st.session_state.calc_result = f"{raw:.8g}"
-            except Exception:
-                st.session_state.calc_result = "Error — check expression"
-        else:
-            st.session_state.calc_expr += val
+  /* Header */
+  .calc-title {
+    font-size: 1.2rem; font-weight: 800; color: #00539B; margin-bottom: 4px;
+  }
+  .calc-sub { font-size: 0.8rem; color: #6D6D6D; margin-bottom: 14px; }
 
-    st.markdown("<div style='max-width:480px;margin:0 auto'>", unsafe_allow_html=True)
-    st.subheader("Scientific Calculator")
-    st.caption("Available for all SAT Math questions (Desmos is built into the digital SAT)")
+  /* Deg toggle */
+  .deg-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    font-size: 0.82rem; font-weight: 600; color: #1A1A1A;
+  }
+  .toggle-wrap { position: relative; display: inline-block; width: 40px; height: 22px; }
+  .toggle-wrap input { opacity: 0; width: 0; height: 0; }
+  .slider-track {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #D1D1D1; border-radius: 22px; transition: .2s;
+  }
+  .slider-track:before {
+    content: ""; position: absolute; height: 16px; width: 16px;
+    left: 3px; bottom: 3px; background: #fff;
+    border-radius: 50%; transition: .2s;
+  }
+  input:checked + .slider-track { background: #0077C8; }
+  input:checked + .slider-track:before { transform: translateX(18px); }
 
-    deg_col, _ = st.columns([1, 3])
-    with deg_col:
-        st.session_state.calc_deg = st.toggle(
-            "Degrees", value=st.session_state.calc_deg,
-            help="Toggle between degrees and radians for trig functions"
-        )
+  /* Display */
+  .display {
+    background: #F5F5F5; border: 2px solid #D1D1D1; border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 10px; min-height: 72px;
+  }
+  .display-expr {
+    font-family: 'Courier New', monospace; font-size: 0.85rem;
+    color: #6D6D6D; min-height: 1.3em; word-break: break-all;
+  }
+  .display-result {
+    font-family: 'Courier New', monospace; font-size: 1.7rem;
+    font-weight: 800; color: #00539B; min-height: 1.2em; margin-top: 2px;
+  }
+  .display-result.error { color: #C8102E; }
 
-    expr_display = st.session_state.calc_expr or "0"
-    result_display = f"= {st.session_state.calc_result}" if st.session_state.calc_result else ""
-    st.markdown(
-        f"<div style='background:#0e1117;border:1px solid #333;border-radius:8px;"
-        f"padding:12px 16px;margin-bottom:8px;min-height:64px'>"
-        f"<div style='color:#888;font-size:0.85em;font-family:monospace;min-height:1.2em'>{expr_display}</div>"
-        f"<div style='color:#fff;font-size:1.6em;font-weight:700;font-family:monospace'>{result_display}</div>"
-        f"</div>",
-        unsafe_allow_html=True,
-    )
+  /* Button grid — 5 equal columns, all buttons same height */
+  .btn-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .btn {
+    height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit; font-size: 0.88rem; font-weight: 700;
+    border-radius: 4px; border: 2px solid #0077C8;
+    background: #FFFFFF; color: #0077C8;
+    cursor: pointer; user-select: none;
+    transition: background 0.12s, border-color 0.12s, transform 0.05s;
+    white-space: nowrap;
+  }
+  .btn:hover    { background: #E8F1F9; border-color: #00539B; color: #00539B; }
+  .btn:active   { transform: scale(0.95); }
 
-    ROWS = [
-        [("sin(","sin("), ("cos(","cos("), ("tan(","tan("), ("log(","log("), ("ln(","ln(")],
-        [("√(","√("),    ("xʸ","^"),       ("(",  "("),     (")",  ")"),     ("π", "π")],
-        [("C", "C"),     ("⌫","⌫"),         ("e",  "e"),    ("%",  "%"),     ("1/(","1/(")],
-        [("7","7"),      ("8","8"),          ("9","9"),       ("÷","/")],
-        [("4","4"),      ("5","5"),          ("6","6"),       ("×","*")],
-        [("1","1"),      ("2","2"),          ("3","3"),       ("−","-")],
-        [("0","0"),      (".","."  ),        ("=","="),       ("+","+")],
-    ]
-    PRIMARY_VALS = {"="}
+  .btn.fn       { background: #F0F7FF; }          /* function keys: trig, sqrt… */
+  .btn.fn:hover { background: #D8ECFC; }
+  .btn.op       { background: #FAFAFA; color: #00539B; } /* operators +−×÷ */
+  .btn.op:hover { background: #E8F1F9; }
+  .btn.clear    { border-color: #C8102E; color: #C8102E; background: #fff; }
+  .btn.clear:hover { background: #FDE8EA; }
+  .btn.del      { border-color: #6D6D6D; color: #6D6D6D; }
+  .btn.del:hover { background: #F5F5F5; }
+  .btn.equals   { background: #0077C8; color: #FFFFFF; border-color: #0077C8; }
+  .btn.equals:hover { background: #005fa3; border-color: #005fa3; }
 
-    for r_idx, row in enumerate(ROWS):
-        cols = st.columns(len(row))
-        for c_idx, (label, val) in enumerate(row):
-            btn_type = "primary" if val in PRIMARY_VALS else "secondary"
-            with cols[c_idx]:
-                if st.button(label, key=f"calc_btn_{r_idx}_{c_idx}",
-                             use_container_width=True, type=btn_type):
-                    _calc_press(val)
-                    st.rerun()
+  .tip { font-size: 0.74rem; color: #6D6D6D; margin-top: 10px; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="calc-wrap">
 
-    st.caption("Tip: ^ for power · log = log₁₀ · ln = natural log · trig in degrees by default")
-    st.markdown("</div>", unsafe_allow_html=True)
+  <div class="calc-title">Scientific Calculator</div>
+  <div class="calc-sub">Available for all SAT Math questions (Desmos is built into the digital SAT)</div>
+
+  <div class="deg-row">
+    <label class="toggle-wrap">
+      <input type="checkbox" id="degToggle" checked onchange="updateDeg()">
+      <span class="slider-track"></span>
+    </label>
+    <span id="degLabel">Degrees</span>
+  </div>
+
+  <div class="display">
+    <div class="display-expr" id="expr">0</div>
+    <div class="display-result" id="result"></div>
+  </div>
+
+  <div class="btn-grid">
+    <!-- Row 1: trig -->
+    <button class="btn fn" onclick="press('sin(')">sin(</button>
+    <button class="btn fn" onclick="press('cos(')">cos(</button>
+    <button class="btn fn" onclick="press('tan(')">tan(</button>
+    <button class="btn fn" onclick="press('log(')">log(</button>
+    <button class="btn fn" onclick="press('ln(')">ln(</button>
+    <!-- Row 2: functions -->
+    <button class="btn fn" onclick="press('sqrt(')">√(</button>
+    <button class="btn fn" onclick="press('^')">xʸ</button>
+    <button class="btn fn" onclick="press('(')"> ( </button>
+    <button class="btn fn" onclick="press(')')"> ) </button>
+    <button class="btn fn" onclick="press('π')">π</button>
+    <!-- Row 3: misc -->
+    <button class="btn clear" onclick="clearAll()">C</button>
+    <button class="btn del"   onclick="backspace()">⌫</button>
+    <button class="btn fn"    onclick="press('e')">e</button>
+    <button class="btn fn"    onclick="press('%')">%</button>
+    <button class="btn fn"    onclick="press('1/(')">1/(</button>
+    <!-- Row 4: 7 8 9 ÷ √ -->
+    <button class="btn" onclick="press('7')">7</button>
+    <button class="btn" onclick="press('8')">8</button>
+    <button class="btn" onclick="press('9')">9</button>
+    <button class="btn op" onclick="press('/')">÷</button>
+    <button class="btn fn" onclick="press('sqrt(')">√</button>
+    <!-- Row 5: 4 5 6 × ^ -->
+    <button class="btn" onclick="press('4')">4</button>
+    <button class="btn" onclick="press('5')">5</button>
+    <button class="btn" onclick="press('6')">6</button>
+    <button class="btn op" onclick="press('*')">×</button>
+    <button class="btn fn" onclick="press('^')">xʸ</button>
+    <!-- Row 6: 1 2 3 − abs -->
+    <button class="btn" onclick="press('1')">1</button>
+    <button class="btn" onclick="press('2')">2</button>
+    <button class="btn" onclick="press('3')">3</button>
+    <button class="btn op" onclick="press('-')">−</button>
+    <button class="btn fn" onclick="press('abs(')">|x|</button>
+    <!-- Row 7: 0 . = + -->
+    <button class="btn" onclick="press('0')">0</button>
+    <button class="btn" onclick="press('.')">.</button>
+    <button class="btn equals" onclick="calculate()">=</button>
+    <button class="btn op" onclick="press('+')">+</button>
+    <button class="btn del" onclick="clearAll()">AC</button>
+  </div>
+
+  <div class="tip">
+    ^ for power &nbsp;·&nbsp; log = log₁₀ &nbsp;·&nbsp; ln = natural log
+    &nbsp;·&nbsp; trig uses degrees by default
+  </div>
+</div>
+
+<script>
+let expr = '';
+let degMode = true;
+
+function updateDeg() {
+  degMode = document.getElementById('degToggle').checked;
+  document.getElementById('degLabel').textContent = degMode ? 'Degrees' : 'Radians';
+}
+
+function setExpr(v) {
+  expr = v;
+  document.getElementById('expr').textContent = expr || '0';
+}
+
+function press(val) { setExpr(expr + val); }
+
+function clearAll() {
+  setExpr('');
+  const r = document.getElementById('result');
+  r.textContent = '';
+  r.className = 'display-result';
+}
+
+function backspace() {
+  setExpr(expr.slice(0, -1));
+  document.getElementById('result').textContent = '';
+}
+
+function calculate() {
+  const r = document.getElementById('result');
+  try {
+    let e = expr
+      .replace(/π/g, 'Math.PI')
+      .replace(/\^/g, '**')
+      .replace(/sqrt\(/g, 'Math.sqrt(')
+      .replace(/log\(/g, 'Math.log10(')
+      .replace(/ln\(/g, 'Math.log(')
+      .replace(/abs\(/g, 'Math.abs(');
+
+    if (degMode) {
+      e = e
+        .replace(/sin\(/g, '__sin(')
+        .replace(/cos\(/g, '__cos(')
+        .replace(/tan\(/g, '__tan(');
+    } else {
+      e = e
+        .replace(/sin\(/g, 'Math.sin(')
+        .replace(/cos\(/g, 'Math.cos(')
+        .replace(/tan\(/g, 'Math.tan(');
+    }
+
+    function __sin(x) { return Math.sin(x * Math.PI / 180); }
+    function __cos(x) { return Math.cos(x * Math.PI / 180); }
+    function __tan(x) { return Math.tan(x * Math.PI / 180); }
+
+    // eslint-disable-next-line no-eval
+    let raw = eval(e);
+    let out = (Number.isFinite(raw) && Math.abs(raw - Math.round(raw)) < 1e-10)
+              ? Math.round(raw).toString()
+              : parseFloat(raw.toFixed(8)).toString();
+    r.className = 'display-result';
+    r.textContent = '= ' + out;
+  } catch(_) {
+    r.className = 'display-result error';
+    r.textContent = 'Error';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  const k = e.key;
+  if ('0123456789.+-*/%()'.includes(k)) press(k);
+  else if (k === 'Enter' || k === '=') calculate();
+  else if (k === 'Backspace') backspace();
+  else if (k === 'Escape') clearAll();
+});
+</script>
+</body>
+</html>
+""", height=560, scrolling=False)
 
 # ── Chat Tab ───────────────────────────────────────────────────────────────────
 
@@ -810,11 +1511,11 @@ with tab_tests:
     # ── Helper: countdown timer HTML component ─────────────────────────────────
     def _render_timer(end_ts: float, module_display: str, q_current: int, q_total: int):
         remaining = max(0, int(end_ts - time.time()))
-        color = "#ef4444" if remaining < 60 else ("#f59e0b" if remaining < 300 else "#ffffff")
+        color = "#ef4444" if remaining < 60 else ("#f59e0b" if remaining < 300 else "#FFFFFF")
         components.html(f"""
-        <div style="background:#1e3a5f;color:#fff;display:flex;align-items:center;
+        <div style="background:#00539B;color:#fff;display:flex;align-items:center;
                     justify-content:space-between;padding:10px 24px;
-                    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+                    font-family:'Open Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
                     border-radius:0 0 8px 8px;margin-bottom:4px">
           <span style="font-size:0.95rem;font-weight:600">{module_display}</span>
           <span id="tmr" style="font-size:1.4rem;font-weight:700;font-family:monospace;
@@ -845,11 +1546,11 @@ with tab_tests:
             is_flag  = flagged.get(i, False)
             is_cur   = i == current_q
             if is_cur:
-                bg, border, txt = "#1e3a5f", "#1e3a5f", "#fff"
+                bg, border, txt = "#00539B", "#00539B", "#fff"
             elif answered and is_flag:
                 bg, border, txt = "#fef3c7", "#f59e0b", "#92400e"
             elif answered:
-                bg, border, txt = "#dbeafe", "#3b82f6", "#1e3a5f"
+                bg, border, txt = "#dbeafe", "#3b82f6", "#00539B"
             elif is_flag:
                 bg, border, txt = "#fff", "#f59e0b", "#92400e"
             else:
@@ -877,7 +1578,7 @@ with tab_tests:
         passage = q.get("passage", "").strip()
         if passage:
             st.markdown(
-                f"<div style='background:#f0f4f9;border-left:4px solid #1e3a5f;"
+                f"<div style='background:#f0f4f9;border-left:4px solid #00539B;"
                 f"padding:14px 18px;border-radius:0 8px 8px 0;margin-bottom:16px;"
                 f"font-size:0.95rem;line-height:1.65;color:#1a1a2e'>{passage}</div>",
                 unsafe_allow_html=True,
@@ -956,10 +1657,16 @@ with tab_tests:
 
     # ── Phase: lobby ──────────────────────────────────────────────────────────
     if st.session_state.ft_phase == "lobby":
-        st.subheader("📝 Full-Length SAT Practice Tests")
-        st.caption(
-            "Four-module adaptive test — R&W Module 1 → R&W Module 2 → Math Module 1 → Math Module 2. "
-            "Each module is timed. Questions are AI-generated in the style of the Digital SAT (Bluebook)."
+        st.markdown(
+            "<div style='margin:16px 0 20px'>"
+            "<h2 style='color:#00539B;font-size:1.35rem;font-weight:800;margin:0 0 4px;"
+            "font-family:\"Open Sans\",sans-serif'>📝 Full-Length SAT Practice Tests</h2>"
+            "<p style='color:#6D6D6D;font-size:0.85rem;margin:0;font-family:\"Open Sans\",sans-serif'>"
+            "Four-module adaptive test — R&amp;W Module 1 → R&amp;W Module 2 → Math Module 1 → Math Module 2. "
+            "Each module is timed. Questions are AI-generated in the style of the Digital SAT (Bluebook).</p>"
+            "<div style='height:3px;background:linear-gradient(90deg,#00539B,#0077C8);border-radius:2px;margin-top:10px'></div>"
+            "</div>",
+            unsafe_allow_html=True,
         )
 
         st.info(
@@ -980,7 +1687,14 @@ with tab_tests:
         saved = list_saved_tests()
         if saved:
             st.divider()
-            st.subheader("Saved Tests")
+            st.markdown(
+                "<div style='margin:16px 0 12px;padding-bottom:8px;"
+                "border-bottom:2px solid #D1D1D1'>"
+                "<span style='color:#00539B;font-size:1rem;font-weight:700;"
+                "font-family:\"Open Sans\",sans-serif'>Saved Tests</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
             for t in saved:
                 created = t["created_at"][:16].replace("T", " ") if t.get("created_at") else "?"
                 col_info, col_start, col_review = st.columns([3, 1, 1])
@@ -1052,7 +1766,7 @@ with tab_tests:
         cfg     = MODULE_CONFIGS[mod_idx]
 
         st.markdown(
-            f"<div style='background:#1e3a5f;color:#fff;border-radius:12px;"
+            f"<div style='background:#00539B;color:#fff;border-radius:8px;"
             f"padding:28px 32px;margin-bottom:24px'>"
             f"<div style='font-size:0.8rem;opacity:0.75;text-transform:uppercase;"
             f"letter-spacing:0.08em;margin-bottom:4px'>Section {mod_idx + 1} of 4</div>"
@@ -1268,8 +1982,8 @@ with tab_tests:
 
             # Score banner
             st.markdown(
-                f"<div style='background:linear-gradient(135deg,#1e3a5f,#2563eb);"
-                f"color:#fff;border-radius:16px;padding:32px;text-align:center;margin-bottom:24px'>"
+                f"<div style='background:linear-gradient(135deg,#00539B,#0077C8);"
+                f"color:#fff;border-radius:8px;padding:32px;text-align:center;margin-bottom:24px'>"
                 f"<div style='font-size:0.85rem;opacity:0.8;text-transform:uppercase;"
                 f"letter-spacing:0.1em;margin-bottom:8px'>Estimated SAT Score</div>"
                 f"<div style='font-size:4rem;font-weight:800;line-height:1'>{total}</div>"
@@ -1288,7 +2002,14 @@ with tab_tests:
             st.caption("⚠️ Scores are estimates based on approximate College Board scaling tables.")
 
             # Domain breakdown
-            st.subheader("Domain Breakdown")
+            st.markdown(
+                "<div style='margin:16px 0 12px;padding-bottom:8px;"
+                "border-bottom:2px solid #D1D1D1'>"
+                "<span style='color:#00539B;font-size:1.1rem;font-weight:700;"
+                "font-family:\"Open Sans\",sans-serif'>Domain Breakdown</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
             domain_scores = report.get("domain_scores", {})
             cols = st.columns(2)
             for i, (domain, ds) in enumerate(sorted(domain_scores.items())):
@@ -1309,7 +2030,14 @@ with tab_tests:
 
             # Answer review
             st.divider()
-            st.subheader("Question-by-Question Review")
+            st.markdown(
+                "<div style='margin:16px 0 12px;padding-bottom:8px;"
+                "border-bottom:2px solid #D1D1D1'>"
+                "<span style='color:#00539B;font-size:1.1rem;font-weight:700;"
+                "font-family:\"Open Sans\",sans-serif'>Question-by-Question Review</span>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
 
             results = report.get("question_results", [])
             last_module = None
@@ -1328,7 +2056,7 @@ with tab_tests:
                 ):
                     if r.get("passage"):
                         st.markdown(
-                            f"<div style='background:#f0f4f9;border-left:3px solid #1e3a5f;"
+                            f"<div style='background:#f0f4f9;border-left:3px solid #00539B;"
                             f"padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:10px;"
                             f"font-size:0.88rem;color:#374151'>{r['passage']}</div>",
                             unsafe_allow_html=True,
@@ -1364,34 +2092,55 @@ with tab_topic:
 
     # ── Phase: lobby ──────────────────────────────────────────────────────────
     if _tt.tt_phase == "lobby":
-        st.subheader("📚 Topic Tests")
-        st.caption(
-            "Generate a focused mini-test on any SAT topic. "
-            "Every question comes with a Khan Academy review link so you can go deep on anything you miss."
+        # ── Page title ────────────────────────────────────────────────────────
+        st.markdown(
+            "<div style='padding:20px 0 4px'>"
+            "<h2 style='color:#00539B;font-size:1.4rem;font-weight:800;margin:0 0 4px;"
+            "font-family:\"Open Sans\",sans-serif;letter-spacing:-0.01em'>Topic Tests</h2>"
+            "<p style='color:#6D6D6D;font-size:0.875rem;margin:0;line-height:1.5'>"
+            "Pick a topic, set difficulty, and get a focused mini-test with instant Khan Academy review links.</p>"
+            "</div>",
+            unsafe_allow_html=True,
         )
+        st.markdown("<hr style='border:none;border-top:2px solid #D1D1D1;margin:0 0 20px'>", unsafe_allow_html=True)
 
-        col_subj, col_topic, col_diff, col_n = st.columns([1, 2, 1, 1])
+        # ── Two-column layout: controls left, preview card right ──────────────
+        ctrl_col, card_col = st.columns([1, 1], gap="large")
 
-        with col_subj:
-            subj_choice = st.radio(
-                "Section",
-                options=["math", "reading_writing"],
-                format_func=lambda s: "📐 Math" if s == "math" else "📖 Reading & Writing",
-                index=0 if _tt.tt_subject == "math" else 1,
-                key="tt_subj_radio",
+        with ctrl_col:
+            # Section toggle — HTML buttons backed by query param trick
+            _tt_is_math = _tt.tt_subject == "math"
+            st.markdown(
+                "<label style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
+                "letter-spacing:0.08em;color:#6D6D6D;display:block;margin-bottom:6px'>Section</label>",
+                unsafe_allow_html=True,
             )
-            if subj_choice != _tt.tt_subject:
-                _tt.tt_subject = subj_choice
-                _tt.tt_topic   = None
-                st.rerun()
+            s_c1, s_c2 = st.columns(2)
+            with s_c1:
+                if st.button(
+                    "📐 Math",
+                    use_container_width=True,
+                    type="primary" if _tt_is_math else "secondary",
+                    key="tt_math_btn",
+                ):
+                    _tt.tt_subject = "math"; _tt.tt_topic = None; st.rerun()
+            with s_c2:
+                if st.button(
+                    "📖 Reading & Writing",
+                    use_container_width=True,
+                    type="primary" if not _tt_is_math else "secondary",
+                    key="tt_rw_btn",
+                ):
+                    _tt.tt_subject = "reading_writing"; _tt.tt_topic = None; st.rerun()
 
-        topics_for_subj = TOPIC_CATALOG[_tt.tt_subject]
-        topic_labels    = [t["label"] for t in topics_for_subj]
-        default_idx     = 0
-        if _tt.tt_topic and _tt.tt_topic.get("label") in topic_labels:
-            default_idx = topic_labels.index(_tt.tt_topic["label"])
+            st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
-        with col_topic:
+            topics_for_subj = TOPIC_CATALOG[_tt.tt_subject]
+            topic_labels    = [t["label"] for t in topics_for_subj]
+            default_idx     = 0
+            if _tt.tt_topic and _tt.tt_topic.get("label") in topic_labels:
+                default_idx = topic_labels.index(_tt.tt_topic["label"])
+
             chosen_label = st.selectbox(
                 "Topic",
                 options=topic_labels,
@@ -1400,52 +2149,80 @@ with tab_topic:
             )
             chosen_topic = next(t for t in topics_for_subj if t["label"] == chosen_label)
 
-        _DIFF_OPTIONS = ["mixed", "easy", "medium", "hard"]
-        _DIFF_LABELS  = {"mixed": "Mixed", "easy": "Easy", "medium": "Medium", "hard": "Hard"}
-        with col_diff:
-            diff_choice = st.selectbox(
-                "Difficulty",
-                options=_DIFF_OPTIONS,
-                index=_DIFF_OPTIONS.index(_tt.tt_difficulty),
-                format_func=lambda d: _DIFF_LABELS[d],
-                key="tt_diff_select",
+            d_col, n_col = st.columns(2)
+            _DIFF_OPTIONS = ["mixed", "easy", "medium", "hard"]
+            _DIFF_LABELS  = {"mixed": "Mixed", "easy": "Easy", "medium": "Medium", "hard": "Hard"}
+            with d_col:
+                diff_choice = st.selectbox(
+                    "Difficulty",
+                    options=_DIFF_OPTIONS,
+                    index=_DIFF_OPTIONS.index(_tt.tt_difficulty),
+                    format_func=lambda d: _DIFF_LABELS[d],
+                    key="tt_diff_select",
+                )
+            with n_col:
+                num_q = st.select_slider(
+                    "Questions",
+                    options=[5, 8, 10, 15, 20],
+                    value=_tt.tt_num_q,
+                    key="tt_num_q_slider",
+                )
+
+            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+            # Generate button — full-width, prominent
+            _btn_label = f"Generate {num_q}-Question Test →"
+            if st.button(_btn_label, type="primary", use_container_width=True, key="tt_gen_btn"):
+                pass  # handled below
+
+        # ── Right: Topic preview card ─────────────────────────────────────────
+        with card_col:
+            _diff_badge_color = {
+                "mixed": "#6366f1", "easy": "#2D8C4E",
+                "medium": "#C8830E", "hard": "#C8102E",
+            }
+            _dc = _diff_badge_color.get(diff_choice, "#6366f1")
+            st.markdown(
+                f"<div style='background:#F0F7FF;border:1px solid #C2D9EF;border-radius:10px;"
+                f"padding:22px 24px;margin-top:28px;height:100%'>"
+
+                # Domain badge
+                f"<div style='font-size:0.68rem;font-weight:700;text-transform:uppercase;"
+                f"letter-spacing:0.1em;color:#0077C8;margin-bottom:10px'>"
+                f"{chosen_topic['domain']}</div>"
+
+                # Topic title
+                f"<div style='font-size:1.15rem;font-weight:800;color:#00539B;"
+                f"line-height:1.25;margin-bottom:10px'>{chosen_topic['label']}</div>"
+
+                # Difficulty + count badges
+                f"<div style='display:flex;gap:8px;margin-bottom:14px'>"
+                f"<span style='font-size:0.72rem;font-weight:700;padding:3px 10px;"
+                f"border-radius:12px;background:{_dc}14;color:{_dc};"
+                f"border:1px solid {_dc}44'>{_DIFF_LABELS[diff_choice]}</span>"
+                f"<span style='font-size:0.72rem;font-weight:700;padding:3px 10px;"
+                f"border-radius:12px;background:#00539B14;color:#00539B;"
+                f"border:1px solid #00539B44'>{num_q} questions</span>"
+                f"</div>"
+
+                # Subtopics
+                f"<p style='font-size:0.82rem;color:#374151;line-height:1.55;margin-bottom:14px'>"
+                f"{chosen_topic['subtopics']}</p>"
+
+                # KA link
+                f"<a href='{chosen_topic['ka_url']}' target='_blank' "
+                f"style='display:inline-flex;align-items:center;gap:6px;font-size:0.8rem;"
+                f"font-weight:600;color:#0077C8;text-decoration:none;"
+                f"border:1px solid #C2D9EF;padding:6px 12px;border-radius:6px;"
+                f"background:#FFFFFF'>"
+                f"📖 Review on Khan Academy ↗</a>"
+
+                f"</div>",
+                unsafe_allow_html=True,
             )
 
-        with col_n:
-            num_q = st.select_slider(
-                "# of Questions",
-                options=[5, 8, 10, 15, 20],
-                value=_tt.tt_num_q,
-                key="tt_num_q_slider",
-            )
-
-        # Show topic info card
-        _diff_badge_color = {"mixed": "#6366f1", "easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}
-        st.markdown(
-            f"<div style='background:#0e1117;border:1px solid #2a2a3e;border-radius:10px;"
-            f"padding:14px 18px;margin:12px 0'>"
-            f"<div style='display:flex;align-items:center;gap:10px;margin-bottom:4px'>"
-            f"<span style='font-weight:700;font-size:1rem'>{chosen_topic['label']}</span>"
-            f"<span style='font-size:0.72em;font-weight:600;padding:2px 8px;border-radius:20px;"
-            f"background:{_diff_badge_color.get(diff_choice,'#6366f1')}22;"
-            f"color:{_diff_badge_color.get(diff_choice,'#6366f1')};border:1px solid {_diff_badge_color.get(diff_choice,'#6366f1')}44'>"
-            f"{_DIFF_LABELS[diff_choice]}</span>"
-            f"</div>"
-            f"<div style='font-size:0.82em;color:#aaa;margin-bottom:8px'>"
-            f"Domain: {chosen_topic['domain']}</div>"
-            f"<div style='font-size:0.82em;color:#ccc'>{chosen_topic['subtopics']}</div>"
-            f"<div style='margin-top:10px;font-size:0.8em'>"
-            f"📖 Review: <a href='{chosen_topic['ka_url']}' target='_blank' "
-            f"style='color:#0ea5e9'>{chosen_topic['ka_label']}</a></div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-        if st.button(
-            f"🚀 Generate {num_q}-Question Test: {chosen_label} ({_DIFF_LABELS[diff_choice]})",
-            type="primary",
-            use_container_width=True,
-        ):
+        # ── Generate logic (triggered by button above) ────────────────────────
+        if st.session_state.get("tt_gen_btn"):
             if not _tt_api_key():
                 st.error("ANTHROPIC_API_KEY not set.")
             else:
@@ -1461,7 +2238,14 @@ with tab_topic:
 
         # ── Performance Dashboard ──────────────────────────────────────────────
         st.divider()
-        st.subheader("Performance Dashboard")
+        st.markdown(
+            "<div style='margin:16px 0 20px'>"
+            "<h2 style='color:#00539B;font-size:1.2rem;font-weight:800;margin:0 0 4px;"
+            "font-family:\"Open Sans\",sans-serif'>Performance Dashboard</h2>"
+            "<div style='height:3px;background:linear-gradient(90deg,#00539B,#0077C8);border-radius:2px;margin-top:8px'></div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
         math_hist = load_topic_history("math")
         rw_hist   = load_topic_history("reading_writing")
@@ -1475,16 +2259,17 @@ with tab_topic:
             if pred:
                 p_cols = st.columns(len(pred))
                 labels = {"math_scaled": "Math", "rw_scaled": "Reading & Writing", "total": "Predicted Total"}
-                colors = {"math_scaled": "#3b82f6", "rw_scaled": "#8b5cf6", "total": "#10b981"}
+                colors = {"math_scaled": "#0077C8", "rw_scaled": "#2D8C4E", "total": "#00539B"}
                 for col, (key, val) in zip(p_cols, pred.items()):
                     with col:
                         st.markdown(
-                            f"<div style='background:#0e1117;border:1px solid {colors[key]};"
-                            f"border-radius:10px;padding:14px;text-align:center'>"
-                            f"<div style='font-size:0.75rem;color:#aaa;text-transform:uppercase;"
-                            f"letter-spacing:0.07em'>{labels[key]}</div>"
+                            f"<div style='background:#FFFFFF;border:2px solid {colors[key]};"
+                            f"border-radius:8px;padding:14px;text-align:center;"
+                            f"box-shadow:0 2px 6px rgba(0,0,0,0.08)'>"
+                            f"<div style='font-size:0.75rem;color:#6D6D6D;text-transform:uppercase;"
+                            f"letter-spacing:0.07em;font-weight:600'>{labels[key]}</div>"
                             f"<div style='font-size:2.2rem;font-weight:800;color:{colors[key]}'>{val}</div>"
-                            f"<div style='font-size:0.72rem;color:#666'>estimated</div>"
+                            f"<div style='font-size:0.72rem;color:#6D6D6D'>estimated</div>"
                             f"</div>",
                             unsafe_allow_html=True,
                         )
@@ -1623,7 +2408,7 @@ with tab_topic:
         _timer_color = "#ef4444" if _remaining < 60 else "#f59e0b" if _low_time else "#22c55e"
 
         st.markdown(
-            f"<div style='background:#1e3a5f;color:#fff;border-radius:10px;"
+            f"<div style='background:#00539B;color:#fff;border-radius:8px;"
             f"padding:16px 20px;margin-bottom:16px'>"
             f"<div style='display:flex;justify-content:space-between;align-items:flex-start'>"
             f"<div>"
@@ -1639,7 +2424,7 @@ with tab_topic:
             f"<div style='margin-top:8px;font-size:0.82rem'>"
             f"📖 Review while you work: "
             f"<a href='{topic['ka_url']}' target='_blank' "
-            f"style='color:#7dd3fc;text-decoration:underline'>{topic['ka_label']}</a>"
+            f"style='color:#BFD9F0;text-decoration:underline'>{topic['ka_label']}</a>"
             f"</div>"
             f"</div>"
             f"<div style='text-align:right;flex-shrink:0;margin-left:16px'>"
@@ -1706,7 +2491,7 @@ with tab_topic:
 
             if passage:
                 st.markdown(
-                    f"<div style='background:#f0f4f9;border-left:4px solid #1e3a5f;"
+                    f"<div style='background:#f0f4f9;border-left:4px solid #00539B;"
                     f"padding:10px 14px;border-radius:0 8px 8px 0;margin-bottom:10px;"
                     f"font-size:0.9rem;line-height:1.6;color:#1a1a2e'>{passage}</div>",
                     unsafe_allow_html=True,
@@ -1800,8 +2585,8 @@ with tab_topic:
         _rev_dc       = {"mixed": "#6366f1", "easy": "#22c55e", "medium": "#f59e0b", "hard": "#ef4444"}.get(_rev_diff, "#6366f1")
         _timed_out    = _tt.get("tt_time_expired", False)
         st.markdown(
-            f"<div style='background:linear-gradient(135deg,#1e3a5f,#2563eb);"
-            f"color:#fff;border-radius:14px;padding:24px 28px;text-align:center;margin-bottom:20px'>"
+            f"<div style='background:linear-gradient(135deg,#00539B,#0077C8);"
+            f"color:#fff;border-radius:8px;padding:24px 28px;text-align:center;margin-bottom:20px'>"
             f"<div style='font-size:0.8rem;opacity:0.75;text-transform:uppercase;"
             f"letter-spacing:0.1em;margin-bottom:6px'>"
             f"{'⏰ Time\'s Up — Auto-submitted' if _timed_out else 'Topic Test Results'}</div>"
@@ -1820,10 +2605,10 @@ with tab_topic:
 
         # KA review link banner
         st.markdown(
-            f"<div style='background:#0e1117;border:1px solid #0ea5e9;border-radius:8px;"
+            f"<div style='background:#E8F1F9;border:1px solid #0077C8;border-radius:6px;"
             f"padding:12px 16px;margin-bottom:16px;font-size:0.88rem'>"
-            f"📖 <strong>Review this topic:</strong> "
-            f"<a href='{topic['ka_url']}' target='_blank' style='color:#0ea5e9'>"
+            f"📖 <strong style='color:#00539B'>Review this topic:</strong> "
+            f"<a href='{topic['ka_url']}' target='_blank' style='color:#0077C8;font-weight:600'>"
             f"{topic['ka_label']}</a>"
             f"</div>",
             unsafe_allow_html=True,
@@ -1845,7 +2630,7 @@ with tab_topic:
             ):
                 if r.get("passage"):
                     st.markdown(
-                        f"<div style='background:#f0f4f9;border-left:3px solid #1e3a5f;"
+                        f"<div style='background:#f0f4f9;border-left:3px solid #00539B;"
                         f"padding:10px 14px;border-radius:0 6px 6px 0;margin-bottom:10px;"
                         f"font-size:0.88rem;color:#374151'>{r['passage']}</div>",
                         unsafe_allow_html=True,
@@ -1876,10 +2661,10 @@ with tab_topic:
                     q_ka_url   = topic["ka_url"]
                     q_ka_label = topic["ka_label"]
                 st.markdown(
-                    f"<div style='margin-top:8px;padding:8px 12px;background:#0e1117;"
-                    f"border-radius:6px;font-size:0.82em'>"
-                    f"📖 <strong>Review on Khan Academy:</strong> "
-                    f"<a href='{q_ka_url}' target='_blank' style='color:#0ea5e9'>"
+                    f"<div style='margin-top:8px;padding:8px 12px;background:#E8F1F9;"
+                    f"border-radius:6px;font-size:0.82em;border-left:3px solid #0077C8'>"
+                    f"📖 <strong style='color:#00539B'>Review on Khan Academy:</strong> "
+                    f"<a href='{q_ka_url}' target='_blank' style='color:#0077C8;font-weight:600'>"
                     f"{q_ka_label}</a></div>",
                     unsafe_allow_html=True,
                 )
