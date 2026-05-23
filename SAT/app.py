@@ -85,36 +85,43 @@ st.markdown(
     .main, .block-container { background: #FFFFFF !important; }
     /* ── Streamlit chrome cleanup ── */
     [data-testid="stDecoration"]        { display: none !important; }
-    /* Keep stHeader so sidebar toggle stays functional — just make it invisible */
-    [data-testid="stHeader"]            { background: transparent !important;
-                                          height: 0 !important;
-                                          min-height: 0 !important;
-                                          overflow: visible !important; }
-    /* Hide only the toolbar actions (Deploy, share icons) not the sidebar pin */
+    /* Native header stays visible so sidebar toggle works — styled navy to blend with our custom header */
+    [data-testid="stHeader"]            { background: #00539B !important;
+                                          height: 56px !important;
+                                          min-height: 56px !important;
+                                          padding: 0 !important; }
+    /* Hide deploy/share toolbar actions inside the header */
     [data-testid="stToolbarActions"]    { display: none !important; }
     [data-testid="stToolbar"]           { display: none !important; }
     .stDeployButton                     { display: none !important; }
     #MainMenu                           { display: none !important; }
     footer                              { display: none !important; }
 
-    /* Sidebar collapse/expand button — keep it accessible */
+    /* Sidebar toggle — white icon on navy, always above our fixed overlay */
     [data-testid="collapsedControl"],
     button[data-testid="baseButton-headerNoPadding"] {
-        background: #00539B !important;
+        background: transparent !important;
         color: #FFFFFF !important;
         border-radius: 0 4px 4px 0 !important;
-        z-index: 999 !important;
+        z-index: 10000 !important;
+        position: relative !important;
+    }
+    [data-testid="collapsedControl"] svg,
+    button[data-testid="baseButton-headerNoPadding"] svg {
+        color: #FFFFFF !important;
+        fill: #FFFFFF !important;
     }
 
-    /* ── Main content — no top padding (custom header takes that space) ── */
-    .block-container { padding-top: 0 !important; max-width: 100% !important;
+    /* ── Main content — padding-top clears fixed two-tier header (56 + 50 + 4px gap) ── */
+    .block-container { padding-top: 120px !important; max-width: 100% !important;
                        padding-left: 1.5rem !important; padding-right: 1.5rem !important; }
 
     /* ── Base text ── */
     body, .stMarkdown, [data-testid="stMarkdownContainer"] { color: #1A1A1A !important; }
     p, li { color: #1A1A1A !important; line-height: 1.6 !important; }
-    a { color: #0077C8 !important; }
-    a:hover { color: #00539B !important; text-decoration: underline !important; }
+    /* Scope link color to main content only — custom header <a> tags use inline colors */
+    [data-testid="stMain"] a, .stMarkdown a { color: #0077C8 !important; }
+    [data-testid="stMain"] a:hover, .stMarkdown a:hover { color: #00539B !important; text-decoration: underline !important; }
 
     /* ── Headings — CB Navy, Open Sans Bold ── */
     h1, h2, h3,
@@ -910,18 +917,23 @@ rw_txt    = "#FFFFFF"  if not _is_math else "#0077C8"
 # ══════════════════════════════════════════════════════════════════════════════
 st.markdown(
     f"""
-    <!-- ░░ TIER 1 — Brand bar ░░ -->
+    <!-- ░░ TIER 1 — Brand bar (fixed, overlays native navy stHeader) ░░ -->
     <div style='
+        position:fixed;
+        top:0;
+        left:0;
+        right:0;
         background:#00539B;
         padding:0 24px;
         display:flex;
         flex-direction:row;
         align-items:center;
         justify-content:flex-start;
-        min-height:56px;
+        height:56px;
         gap:0;
-        margin: 0 -1.5rem;
+        z-index:999;
         box-sizing:border-box;
+        pointer-events:none;
     '>
       <!-- Logo + section name -->
       <div style='display:flex;align-items:center;gap:10px;flex:1'>
@@ -950,35 +962,43 @@ st.markdown(
 
     </div>
 
-    <!-- ░░ TIER 2 — Section switcher + quick actions ░░ -->
+    <!-- ░░ TIER 2 — Section switcher + quick actions (fixed below tier-1) ░░ -->
     <div style='
+        position:fixed;
+        top:56px;
+        left:0;
+        right:0;
         background:#FFFFFF;
+        border-top:3px solid #C8102E;
         border-bottom:2px solid #D1D1D1;
         padding:0 24px;
         display:flex;
         align-items:center;
-        min-height:50px;
+        height:50px;
         gap:8px;
-        flex-wrap:wrap;
-        margin: 0 -1.5rem 16px;
+        flex-wrap:nowrap;
+        z-index:998;
+        box-sizing:border-box;
     '>
       <!-- Section switcher — always visible, primary navigation -->
       <div style='display:flex;align-items:center;gap:0;border:2px solid #0077C8;
                   border-radius:5px;overflow:hidden;flex-shrink:0;margin-right:12px'>
         <a href='?switch_section=math'
            style='display:inline-flex;align-items:center;gap:6px;
-                  background:{math_bg};color:{math_txt};
+                  background:{math_bg} !important;color:{math_txt} !important;
                   font-size:0.85rem;font-weight:700;
-                  padding:8px 16px;text-decoration:none;white-space:nowrap;
-                  border-right:1px solid #0077C8'>
-          📐 Math
+                  padding:8px 16px;text-decoration:none !important;white-space:nowrap;
+                  border-right:1px solid #0077C8;line-height:1.2;
+                  font-family:Open Sans,sans-serif'>
+          &#x1F4D0; Math
         </a>
         <a href='?switch_section=reading_writing'
            style='display:inline-flex;align-items:center;gap:6px;
-                  background:{rw_bg};color:{rw_txt};
+                  background:{rw_bg} !important;color:{rw_txt} !important;
                   font-size:0.85rem;font-weight:700;
-                  padding:8px 16px;text-decoration:none;white-space:nowrap'>
-          📖 Reading &amp; Writing
+                  padding:8px 16px;text-decoration:none !important;white-space:nowrap;
+                  line-height:1.2;font-family:Open Sans,sans-serif'>
+          &#x1F4D6; Reading &amp; Writing
         </a>
       </div>
 
@@ -988,39 +1008,39 @@ st.markdown(
       <!-- Quick actions -->
       <a href='?action=schedule'
          style='display:inline-flex;align-items:center;gap:5px;
-                color:#00539B;text-decoration:none;font-size:0.82rem;font-weight:600;
+                color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
                 padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
-                background:#F5F5F5;white-space:nowrap'
+                background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
          onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
          onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
-        📅 Schedule
+        &#x1F4C5; Schedule
       </a>
       <a href='?action=weak'
          style='display:inline-flex;align-items:center;gap:5px;
-                color:#00539B;text-decoration:none;font-size:0.82rem;font-weight:600;
+                color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
                 padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
-                background:#F5F5F5;white-space:nowrap'
+                background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
          onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
          onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
-        ⚠️ Weak Topics
+        &#x26A0;&#xFE0F; Weak Topics
       </a>
       <a href='?action=report'
          style='display:inline-flex;align-items:center;gap:5px;
-                color:#00539B;text-decoration:none;font-size:0.82rem;font-weight:600;
+                color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
                 padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
-                background:#F5F5F5;white-space:nowrap'
+                background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
          onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
          onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
-        📊 Report
+        &#x1F4CA; Report
       </a>
       <a href='?action=diagnose'
          style='display:inline-flex;align-items:center;gap:5px;
-                color:#00539B;text-decoration:none;font-size:0.82rem;font-weight:600;
+                color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
                 padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
-                background:#F5F5F5;white-space:nowrap'
+                background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
          onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
          onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
-        🧪 Diagnose
+        &#x1F9EA; Diagnose
       </a>
     </div>
     """,
