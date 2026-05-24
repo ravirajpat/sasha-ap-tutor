@@ -114,8 +114,10 @@ st.markdown(
     }
 
     /* ── Main content — padding-top clears fixed two-tier header (56 + 50px) ── */
-    .block-container { padding-top: 108px !important; max-width: 100% !important;
+    .block-container { padding-top: 106px !important; max-width: 100% !important;
                        padding-left: 1.5rem !important; padding-right: 1.5rem !important; }
+    /* Tighten gap below the tab bar */
+    [data-testid="stTabsContent"] { padding-top: 8px !important; }
 
     /* ── Base text ── */
     body, .stMarkdown, [data-testid="stMarkdownContainer"] { color: #1A1A1A !important; }
@@ -1006,43 +1008,45 @@ st.markdown(
       <!-- Divider -->
       <span style='width:1px;height:24px;background:#D1D1D1;display:inline-block;margin:0 4px;flex-shrink:0'></span>
 
-      <!-- Quick actions -->
-      <a href='?action=schedule'
-         style='display:inline-flex;align-items:center;align-self:center;gap:5px;
-                color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
-                padding:9px 14px;border-radius:4px;border:1px solid #C2D9EF;
-                background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
-         onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
-         onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
-        &#x1F4C5; Schedule
-      </a>
-      <a href='?action=weak'
-         style='display:inline-flex;align-items:center;align-self:center;gap:5px;
-                color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
-                padding:9px 14px;border-radius:4px;border:1px solid #C2D9EF;
-                background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
-         onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
-         onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
-        &#x26A0;&#xFE0F; Weak Topics
-      </a>
-      <a href='?action=report'
-         style='display:inline-flex;align-items:center;align-self:center;gap:5px;
-                color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
-                padding:9px 14px;border-radius:4px;border:1px solid #C2D9EF;
-                background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
-         onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
-         onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
-        &#x1F4CA; Report
-      </a>
-      <a href='?action=diagnose'
-         style='display:inline-flex;align-items:center;align-self:center;gap:5px;
-                color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
-                padding:9px 14px;border-radius:4px;border:1px solid #C2D9EF;
-                background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
-         onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
-         onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
-        &#x1F9EA; Diagnose
-      </a>
+      <!-- Quick actions — wrapped in a centered flex row so buttons never stretch -->
+      <div style='display:flex;align-items:center;gap:8px;margin-left:auto'>
+        <a href='?action=schedule'
+           style='display:inline-flex;align-items:center;gap:5px;
+                  color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
+                  padding:7px 13px;border-radius:4px;border:1px solid #C2D9EF;
+                  background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
+           onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
+           onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
+          &#x1F4C5; Schedule
+        </a>
+        <a href='?action=weak'
+           style='display:inline-flex;align-items:center;gap:5px;
+                  color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
+                  padding:7px 13px;border-radius:4px;border:1px solid #C2D9EF;
+                  background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
+           onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
+           onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
+          &#x26A0;&#xFE0F; Weak Topics
+        </a>
+        <a href='?action=report'
+           style='display:inline-flex;align-items:center;gap:5px;
+                  color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
+                  padding:7px 13px;border-radius:4px;border:1px solid #C2D9EF;
+                  background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
+           onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
+           onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
+          &#x1F4CA; Report
+        </a>
+        <a href='?action=diagnose'
+           style='display:inline-flex;align-items:center;gap:5px;
+                  color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
+                  padding:7px 13px;border-radius:4px;border:1px solid #C2D9EF;
+                  background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
+           onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
+           onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
+          &#x1F9EA; Diagnose
+        </a>
+      </div>
     </div>
     """,
     unsafe_allow_html=True,
