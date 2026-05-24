@@ -89,7 +89,8 @@ st.markdown(
     [data-testid="stHeader"]            { background: #00539B !important;
                                           height: 56px !important;
                                           min-height: 56px !important;
-                                          padding: 0 !important; }
+                                          padding: 0 !important;
+                                          z-index: 990 !important; }
     /* Hide deploy/share toolbar actions inside the header */
     [data-testid="stToolbarActions"]    { display: none !important; }
     [data-testid="stToolbar"]           { display: none !important; }
@@ -113,7 +114,7 @@ st.markdown(
     }
 
     /* ── Main content — padding-top clears fixed two-tier header (56 + 50px) ── */
-    .block-container { padding-top: 112px !important; max-width: 100% !important;
+    .block-container { padding-top: 108px !important; max-width: 100% !important;
                        padding-left: 1.5rem !important; padding-right: 1.5rem !important; }
 
     /* ── Base text ── */
@@ -931,7 +932,7 @@ st.markdown(
         justify-content:flex-start;
         height:56px;
         gap:0;
-        z-index:999;
+        z-index:995;
         box-sizing:border-box;
         pointer-events:none;
     '>
@@ -1009,7 +1010,7 @@ st.markdown(
       <a href='?action=schedule'
          style='display:inline-flex;align-items:center;align-self:center;gap:5px;
                 color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
-                padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
+                padding:9px 14px;border-radius:4px;border:1px solid #C2D9EF;
                 background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
          onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
          onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
@@ -1018,7 +1019,7 @@ st.markdown(
       <a href='?action=weak'
          style='display:inline-flex;align-items:center;align-self:center;gap:5px;
                 color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
-                padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
+                padding:9px 14px;border-radius:4px;border:1px solid #C2D9EF;
                 background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
          onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
          onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
@@ -1027,7 +1028,7 @@ st.markdown(
       <a href='?action=report'
          style='display:inline-flex;align-items:center;align-self:center;gap:5px;
                 color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
-                padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
+                padding:9px 14px;border-radius:4px;border:1px solid #C2D9EF;
                 background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
          onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
          onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
@@ -1036,7 +1037,7 @@ st.markdown(
       <a href='?action=diagnose'
          style='display:inline-flex;align-items:center;align-self:center;gap:5px;
                 color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
-                padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
+                padding:9px 14px;border-radius:4px;border:1px solid #C2D9EF;
                 background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
          onmouseover="this.style.background='#E8F1F9';this.style.borderColor='#0077C8'"
          onmouseout="this.style.background='#F5F5F5';this.style.borderColor='#C2D9EF'">
