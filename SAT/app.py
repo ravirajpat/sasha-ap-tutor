@@ -2151,14 +2151,14 @@ with tab_topic:
                 f"<label style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
                 f"letter-spacing:0.08em;color:#6D6D6D;display:block;margin-bottom:6px'>Section</label>"
                 f"<div style='display:flex;border:2px solid #0077C8;border-radius:6px;overflow:hidden;'>"
-                f"<a href='?tt_subject=math' style='"
-                f"flex:1;text-align:center;padding:9px 0;font-size:0.88rem;font-weight:700;"
-                f"background:{_math_bg};color:{_math_txt} !important;text-decoration:none !important;"
-                f"font-family:Open Sans,sans-serif;border-right:1px solid #0077C8;'>&#x1F4D0; Math</a>"
-                f"<a href='?tt_subject=reading_writing' style='"
-                f"flex:1;text-align:center;padding:9px 0;font-size:0.88rem;font-weight:700;"
-                f"background:{_rw_bg};color:{_rw_txt} !important;text-decoration:none !important;"
-                f"font-family:Open Sans,sans-serif;'>&#x1F4D6; Reading &amp; Writing</a>"
+                f"<div onclick=\"window.location.href=window.location.pathname+'?tt_subject=math';\""
+                f" style='flex:1;text-align:center;padding:9px 0;font-size:0.88rem;font-weight:700;"
+                f"background:{_math_bg};color:{_math_txt};cursor:pointer;"
+                f"font-family:Open Sans,sans-serif;border-right:1px solid #0077C8;user-select:none;'>&#x1F4D0; Math</div>"
+                f"<div onclick=\"window.location.href=window.location.pathname+'?tt_subject=reading_writing';\""
+                f" style='flex:1;text-align:center;padding:9px 0;font-size:0.88rem;font-weight:700;"
+                f"background:{_rw_bg};color:{_rw_txt};cursor:pointer;"
+                f"font-family:Open Sans,sans-serif;user-select:none;'>&#x1F4D6; Reading &amp; Writing</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
