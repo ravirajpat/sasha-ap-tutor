@@ -899,6 +899,14 @@ _sec_color  = _SECTION_COLOR.get(st.session_state.active_agent, "#0077C8")
 _goal_pct   = min(int(q_done / MIN_QUESTIONS * 100), 100)
 _days_color = "#C8102E" if days_left <= 14 else "#FFFFFF"
 
+# Handle topic-test subject toggle (Math / Reading & Writing in-tab switcher)
+_tt_switch = st.query_params.get("tt_subject", "")
+if _tt_switch in AGENTS:
+    st.query_params.clear()
+    st.session_state._tt.tt_subject = _tt_switch
+    st.session_state._tt.tt_topic   = None
+    st.rerun()
+
 # Handle section switch from the tier-2 header switcher
 _switch = st.query_params.get("switch_section", "")
 if _switch in AGENTS and _switch != st.session_state.active_agent:
@@ -2133,30 +2141,27 @@ with tab_topic:
         ctrl_col, card_col = st.columns([1, 1], gap="large")
 
         with ctrl_col:
-            # Section toggle — HTML buttons backed by query param trick
             _tt_is_math = _tt.tt_subject == "math"
+            # Active = solid blue fill; inactive = light grey with grey text
+            _math_bg  = "#0077C8" if _tt_is_math  else "#F0F0F0"
+            _math_txt = "#FFFFFF"  if _tt_is_math  else "#888888"
+            _rw_bg    = "#0077C8" if not _tt_is_math else "#F0F0F0"
+            _rw_txt   = "#FFFFFF"  if not _tt_is_math else "#888888"
             st.markdown(
-                "<label style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
-                "letter-spacing:0.08em;color:#6D6D6D;display:block;margin-bottom:6px'>Section</label>",
+                f"<label style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
+                f"letter-spacing:0.08em;color:#6D6D6D;display:block;margin-bottom:6px'>Section</label>"
+                f"<div style='display:flex;border:2px solid #0077C8;border-radius:6px;overflow:hidden;'>"
+                f"<a href='?tt_subject=math' style='"
+                f"flex:1;text-align:center;padding:9px 0;font-size:0.88rem;font-weight:700;"
+                f"background:{_math_bg};color:{_math_txt} !important;text-decoration:none !important;"
+                f"font-family:Open Sans,sans-serif;border-right:1px solid #0077C8;'>&#x1F4D0; Math</a>"
+                f"<a href='?tt_subject=reading_writing' style='"
+                f"flex:1;text-align:center;padding:9px 0;font-size:0.88rem;font-weight:700;"
+                f"background:{_rw_bg};color:{_rw_txt} !important;text-decoration:none !important;"
+                f"font-family:Open Sans,sans-serif;'>&#x1F4D6; Reading &amp; Writing</a>"
+                f"</div>",
                 unsafe_allow_html=True,
             )
-            s_c1, s_c2 = st.columns(2)
-            with s_c1:
-                if st.button(
-                    "📐 Math",
-                    use_container_width=True,
-                    type="primary" if _tt_is_math else "secondary",
-                    key="tt_math_btn",
-                ):
-                    _tt.tt_subject = "math"; _tt.tt_topic = None; st.rerun()
-            with s_c2:
-                if st.button(
-                    "📖 Reading & Writing",
-                    use_container_width=True,
-                    type="primary" if not _tt_is_math else "secondary",
-                    key="tt_rw_btn",
-                ):
-                    _tt.tt_subject = "reading_writing"; _tt.tt_topic = None; st.rerun()
 
             st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
