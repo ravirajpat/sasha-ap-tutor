@@ -903,8 +903,8 @@ _days_color = "#C8102E" if days_left <= 14 else "#FFFFFF"
 _tt_switch = st.query_params.get("tt_subject", "")
 if _tt_switch in AGENTS:
     st.query_params.clear()
-    st.session_state._tt.tt_subject = _tt_switch
-    st.session_state._tt.tt_topic   = None
+    st.session_state.tt_subject = _tt_switch
+    st.session_state.tt_topic   = None
     st.rerun()
 
 # Handle section switch from the tier-2 header switcher
