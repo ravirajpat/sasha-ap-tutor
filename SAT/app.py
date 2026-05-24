@@ -112,8 +112,8 @@ st.markdown(
         fill: #FFFFFF !important;
     }
 
-    /* ── Main content — padding-top clears fixed two-tier header (56 + 50 + 4px gap) ── */
-    .block-container { padding-top: 120px !important; max-width: 100% !important;
+    /* ── Main content — padding-top clears fixed two-tier header (56 + 50px) ── */
+    .block-container { padding-top: 112px !important; max-width: 100% !important;
                        padding-left: 1.5rem !important; padding-right: 1.5rem !important; }
 
     /* ── Base text ── */
@@ -1007,7 +1007,7 @@ st.markdown(
 
       <!-- Quick actions -->
       <a href='?action=schedule'
-         style='display:inline-flex;align-items:center;gap:5px;
+         style='display:inline-flex;align-items:center;align-self:center;gap:5px;
                 color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
                 padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
                 background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
@@ -1016,7 +1016,7 @@ st.markdown(
         &#x1F4C5; Schedule
       </a>
       <a href='?action=weak'
-         style='display:inline-flex;align-items:center;gap:5px;
+         style='display:inline-flex;align-items:center;align-self:center;gap:5px;
                 color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
                 padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
                 background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
@@ -1025,7 +1025,7 @@ st.markdown(
         &#x26A0;&#xFE0F; Weak Topics
       </a>
       <a href='?action=report'
-         style='display:inline-flex;align-items:center;gap:5px;
+         style='display:inline-flex;align-items:center;align-self:center;gap:5px;
                 color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
                 padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
                 background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
@@ -1034,7 +1034,7 @@ st.markdown(
         &#x1F4CA; Report
       </a>
       <a href='?action=diagnose'
-         style='display:inline-flex;align-items:center;gap:5px;
+         style='display:inline-flex;align-items:center;align-self:center;gap:5px;
                 color:#00539B !important;text-decoration:none !important;font-size:0.82rem;font-weight:600;
                 padding:6px 12px;border-radius:4px;border:1px solid #C2D9EF;
                 background:#F5F5F5;white-space:nowrap;line-height:1.2;font-family:Open Sans,sans-serif'
@@ -2156,18 +2156,40 @@ with tab_topic:
             st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
             topics_for_subj = TOPIC_CATALOG[_tt.tt_subject]
-            topic_labels    = [t["label"] for t in topics_for_subj]
-            default_idx     = 0
-            if _tt.tt_topic and _tt.tt_topic.get("label") in topic_labels:
-                default_idx = topic_labels.index(_tt.tt_topic["label"])
+
+            # Build ordered domain list preserving catalog order
+            _seen_domains = []
+            for _t in topics_for_subj:
+                if _t["domain"] not in _seen_domains:
+                    _seen_domains.append(_t["domain"])
+            _domains = _seen_domains
+
+            # Default domain from previously chosen topic
+            _default_domain_idx = 0
+            if _tt.tt_topic and _tt.tt_topic.get("domain") in _domains:
+                _default_domain_idx = _domains.index(_tt.tt_topic["domain"])
+
+            chosen_domain = st.selectbox(
+                "Domain",
+                options=_domains,
+                index=_default_domain_idx,
+                key="tt_domain_select",
+            )
+
+            # Filter topics to selected domain
+            _domain_topics = [t for t in topics_for_subj if t["domain"] == chosen_domain]
+            _topic_labels  = [t["label"] for t in _domain_topics]
+            _default_topic_idx = 0
+            if _tt.tt_topic and _tt.tt_topic.get("label") in _topic_labels:
+                _default_topic_idx = _topic_labels.index(_tt.tt_topic["label"])
 
             chosen_label = st.selectbox(
                 "Topic",
-                options=topic_labels,
-                index=default_idx,
+                options=_topic_labels,
+                index=_default_topic_idx,
                 key="tt_topic_select",
             )
-            chosen_topic = next(t for t in topics_for_subj if t["label"] == chosen_label)
+            chosen_topic = next(t for t in _domain_topics if t["label"] == chosen_label)
 
             d_col, n_col = st.columns(2)
             _DIFF_OPTIONS = ["mixed", "easy", "medium", "hard"]
