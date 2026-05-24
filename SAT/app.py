@@ -2278,7 +2278,6 @@ with tab_topic:
             if not _tt_api_key():
                 st.error("ANTHROPIC_API_KEY not set.")
             else:
-                _tt.tt_subject      = subj_choice
                 _tt.tt_topic        = chosen_topic
                 _tt.tt_num_q        = num_q
                 _tt.tt_difficulty   = diff_choice
