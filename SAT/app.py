@@ -2148,22 +2148,23 @@ with tab_topic:
             _rw_bg    = "#0077C8" if not _tt_is_math else "#F0F0F0"
             _rw_txt   = "#FFFFFF"  if not _tt_is_math else "#888888"
             st.markdown(
-                f"<label style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
-                f"letter-spacing:0.08em;color:#6D6D6D;display:block;margin-bottom:6px'>Section</label>"
-                f"<div style='display:flex;border:2px solid #0077C8;border-radius:6px;overflow:hidden;'>"
-                f"<div onclick=\"window.location.href=window.location.pathname+'?tt_subject=math';\""
-                f" style='flex:1;text-align:center;padding:9px 0;font-size:0.88rem;font-weight:700;"
-                f"background:{_math_bg};color:{_math_txt};cursor:pointer;"
-                f"font-family:Open Sans,sans-serif;border-right:1px solid #0077C8;user-select:none;'>&#x1F4D0; Math</div>"
-                f"<div onclick=\"window.location.href=window.location.pathname+'?tt_subject=reading_writing';\""
-                f" style='flex:1;text-align:center;padding:9px 0;font-size:0.88rem;font-weight:700;"
-                f"background:{_rw_bg};color:{_rw_txt};cursor:pointer;"
-                f"font-family:Open Sans,sans-serif;user-select:none;'>&#x1F4D6; Reading &amp; Writing</div>"
-                f"</div>",
+                "<label style='font-size:0.72rem;font-weight:700;text-transform:uppercase;"
+                "letter-spacing:0.08em;color:#6D6D6D;display:block;margin-bottom:6px'>Section</label>",
                 unsafe_allow_html=True,
             )
-
-            st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
+            _subj_col_math, _subj_col_rw = st.columns(2, gap="small")
+            with _subj_col_math:
+                if st.button("📐 Math", use_container_width=True,
+                             type="primary" if _tt_is_math else "secondary",
+                             key="tt_subj_math"):
+                    st.session_state.tt_subject = "math"
+                    st.session_state.tt_topic = None
+            with _subj_col_rw:
+                if st.button("📖 Reading & Writing", use_container_width=True,
+                             type="primary" if not _tt_is_math else "secondary",
+                             key="tt_subj_rw"):
+                    st.session_state.tt_subject = "reading_writing"
+                    st.session_state.tt_topic = None
 
             topics_for_subj = TOPIC_CATALOG[_tt.tt_subject]
 
